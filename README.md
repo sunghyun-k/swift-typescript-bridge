@@ -12,7 +12,7 @@ A Swift macro library that brings TypeScript-style union types to Swift, providi
 - 🚀 **TypeScript-like Union Types**: Create union types similar to TypeScript's literal and type unions
 - 🔒 **Type Safety**: Full compile-time type checking with Swift's type system
 - 📦 **Automatic Codable**: Built-in JSON serialization/deserialization support
-- 🌐 **Unicode Support**: Works with any characters including emojis, Korean, Arabic, and Swift keywords
+- 🌐 **Unicode Support**: Works with any characters including emojis and Swift keywords
 - ⚡ **Zero Runtime Cost**: Fully resolved at compile time using Swift macros
 
 ## Installation
@@ -33,121 +33,36 @@ Or add it through Xcode: **File → Add Package Dependencies** and enter the rep
 
 ### String Literal Unions
 
-Create union types from string literals, similar to TypeScript's literal union types:
-
 ```swift
-import TypeScriptBridge
+// TypeScript: type EventType = "click" | "hover" | "focus"
+@Union("click", "hover", "focus") enum EventType {}
 
 struct Event: Codable {
-    @Union("click", "hover", "focus", "blur") enum EventType {}
-    
     let type: EventType
     let timestamp: Date
 }
 
-// Usage
 let event = Event(type: .click, timestamp: Date())
-
-// JSON serialization
-let jsonData = try JSONEncoder().encode(event)
-// {"type":"click","timestamp":"2024-01-01T12:00:00Z"}
-
-// JSON deserialization
-let decoded = try JSONDecoder().decode(Event.self, from: jsonData)
-print(decoded.type) // EventType.click
 ```
 
 ### Type Unions
 
-Create union types from Swift types, similar to TypeScript's union types:
-
 ```swift
-struct User: Codable {
-    let name: String
-    let email: String
-}
-
-struct Organization: Codable {
-    let name: String
-    let memberCount: Int
-}
-
+// TypeScript: type Entity = User | Organization  
 @Union(User.self, Organization.self) enum Entity {}
 
-// Usage
 let user = User(name: "Alice", email: "alice@example.com")
 let entity = Entity.User(user)
-
-// JSON handling - automatically determines the correct type
-let jsonData = """
-{"name": "Acme Corp", "memberCount": 100}
-""".data(using: .utf8)!
-
-let decoded = try JSONDecoder().decode(Entity.self, from: jsonData)
-switch decoded {
-case .User(let user):
-    print("User: \(user.name)")
-case .Organization(let org):
-    print("Organization: \(org.name) with \(org.memberCount) members")
-}
 ```
 
-## Advanced Usage
+## TypeScript Comparison
 
-### Special Characters
-
-The macro supports any characters, including:
-- **Unicode**: `"한국어"`, `"日本語"`, `"العربية"`
-- **Emojis**: `"🎉"`, `"🚀"`, `"💯"`
-- **Swift Keywords**: `"class"`, `"func"`, `"var"`
-- **Numbers**: `"123invalid"`
-- **Symbols**: `"!@#$%^&*()"`
-
-```swift
-@Union("🎉", "🚀", "💯", "한국어", "class", "123test") enum SpecialCases {}
-
-let special = SpecialCases.`🎉`  // Backticks are auto-generated for special cases
-```
-
-### Complex JSON Handling
-
-Type unions automatically handle complex JSON structures:
-
-```swift
-struct APIResponse: Codable {
-    @Union(SuccessResponse.self, ErrorResponse.self) enum Result {}
-    
-    let result: Result
-}
-
-struct SuccessResponse: Codable {
-    let data: [String]
-    let count: Int
-}
-
-struct ErrorResponse: Codable {
-    let error: String
-    let code: Int
-}
-
-// The decoder tries SuccessResponse first, then ErrorResponse
-let response = try JSONDecoder().decode(APIResponse.self, from: jsonData)
-```
-
-### Nested Unions
-
-Unions can be nested and combined:
-
-```swift
-struct UIEvent: Codable {
-    @Union("mouse", "keyboard", "touch") enum InputType {}
-    
-    @Union(MouseEvent.self, KeyboardEvent.self, TouchEvent.self) enum EventData {}
-    
-    let inputType: InputType
-    let data: EventData
-}
-```
+| TypeScript | Swift TypeScript Bridge |
+|------------|-------------------------|
+| `type EventType = "click" \| "hover"` | `@Union("click", "hover") enum EventType {}` |
+| `type Entity = User \| Organization` | `@Union(User.self, Organization.self) enum Entity {}` |
+| Automatic JSON handling | Automatic Codable conformance |
+| Runtime type checking | Compile-time type safety |
 
 ## Requirements
 
@@ -158,20 +73,11 @@ struct UIEvent: Codable {
 Swift TypeScript Bridge uses Swift macros to generate code at compile time:
 
 1. **Literal Unions**: Creates enum cases with backticks for special characters
-2. **Type Unions**: Creates enum cases with associated values for each type
+2. **Type Unions**: Creates enum cases with associated values for each type  
 3. **Codable Support**: Generates custom `init(from:)` and `encode(to:)` implementations
 4. **Access Control**: Applies the same access modifier to all generated code
 
 The generated code is fully visible in Xcode's macro expansion view, making debugging straightforward.
-
-## Comparison with TypeScript
-
-| TypeScript | Swift TypeScript Bridge |
-|------------|-------------------------|
-| `type EventType = "click" \| "hover"` | `@Union("click", "hover") enum EventType {}` |
-| `type Entity = User \| Organization` | `@Union(User.self, Organization.self) enum Entity {}` |
-| Automatic JSON handling | Automatic Codable conformance |
-| Runtime type checking | Compile-time type safety |
 
 ## License
 
