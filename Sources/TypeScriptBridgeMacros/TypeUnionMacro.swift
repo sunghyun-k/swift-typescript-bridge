@@ -20,7 +20,7 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
         }
 
         let typeInfos = try extractTypeInfos(from: node)
-        let accessModifier = extractAccessModifier(from: enumDecl)
+        let accessModifier = MacroUtils.extractAccessModifier(from: enumDecl)
 
         let enumCases = typeInfos.map { typeInfo in
             var enumCase = EnumCaseDeclSyntax(
@@ -65,7 +65,7 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
         }
 
         let typeInfos = try extractTypeInfos(from: node)
-        let accessModifier = extractAccessModifier(from: enumDecl)
+        let accessModifier = MacroUtils.extractAccessModifier(from: enumDecl)
 
         let initFromDecoderMethod = try createInitFromDecoder(cases: typeInfos, accessModifier: accessModifier)
         let encodeToEncoderMethod = try createEncodeToEncoder(cases: typeInfos, accessModifier: accessModifier)
@@ -145,25 +145,6 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
         }
     }
 
-    private static func extractAccessModifier(from enumDecl: EnumDeclSyntax) -> Keyword? {
-        for modifier in enumDecl.modifiers {
-            switch modifier.name.tokenKind {
-            case .keyword(.public):
-                return .public
-            case .keyword(.internal):
-                return .internal
-            case .keyword(.private):
-                return .private
-            case .keyword(.fileprivate):
-                return .fileprivate
-            case .keyword(.package):
-                return .package
-            default:
-                continue
-            }
-        }
-        return nil
-    }
 }
 
 /// Information about a type used in a type union.

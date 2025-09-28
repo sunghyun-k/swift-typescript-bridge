@@ -17,11 +17,11 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
     ) throws -> [DeclSyntax] {
 
         guard let enumDecl = declaration.as(EnumDeclSyntax.self) else {
-            throw MacroError.invalidDeclaration
+            throw LiteralUnionError.invalidDeclaration
         }
 
         let literals = try extractLiterals(from: node)
-        let accessModifier = extractAccessModifier(from: enumDecl)
+        let accessModifier = MacroUtils.extractAccessModifier(from: enumDecl)
 
         let enumCases = literals.map { literal in
             var enumCase = EnumCaseDeclSyntax(
@@ -51,11 +51,11 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
     ) throws -> [ExtensionDeclSyntax] {
 
         guard let enumDecl = declaration.as(EnumDeclSyntax.self) else {
-            throw MacroError.invalidDeclaration
+            throw LiteralUnionError.invalidDeclaration
         }
 
         let literals = try extractLiterals(from: node)
-        let accessModifier = extractAccessModifier(from: enumDecl)
+        let accessModifier = MacroUtils.extractAccessModifier(from: enumDecl)
         let accessPrefix = accessModifier != nil ? "\(accessModifier!) " : ""
 
         // Get the Swift type for the literal values
@@ -137,7 +137,8 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
                     \(raw: accessPrefix)init?(rawValue: \(raw: literalType)) {
                         switch rawValue {
                         \(raw: initCases)
-                        default: return nil
+                        default: 
+                            return nil
                         }
                     }
                     
@@ -163,7 +164,7 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
 
     private static func extractLiterals(from node: AttributeSyntax) throws -> [LiteralValue] {
         guard let arguments = node.arguments?.as(LabeledExprListSyntax.self) else {
-            throw MacroError.noArguments
+            throw LiteralUnionError.noArguments
         }
 
         var literals: [LiteralValue] = []
@@ -190,7 +191,7 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
         }
 
         guard !literals.isEmpty else {
-            throw MacroError.noValidLiterals
+            throw LiteralUnionError.noValidLiterals
         }
 
         return literals
@@ -208,25 +209,6 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
         return "any _LiteralType"
     }
 
-    private static func extractAccessModifier(from enumDecl: EnumDeclSyntax) -> Keyword? {
-        for modifier in enumDecl.modifiers {
-            switch modifier.name.tokenKind {
-            case .keyword(.public):
-                return .public
-            case .keyword(.internal):
-                return .internal
-            case .keyword(.private):
-                return .private
-            case .keyword(.fileprivate):
-                return .fileprivate
-            case .keyword(.package):
-                return .package
-            default:
-                continue
-            }
-        }
-        return nil
-    }
 }
 
 /// Represents different types of literal values that can be used in union types
@@ -311,13 +293,15 @@ enum LiteralValue {
 }
 
 /// Errors that can occur during literal union macro expansion.
-enum MacroError: Error, CustomStringConvertible {
+enum LiteralUnionError: Error, CustomStringConvertible {
     /// The macro was applied to a non-enum declaration
     case invalidDeclaration
     /// No arguments were provided to the macro
     case noArguments
     /// No valid literals were found in the arguments
     case noValidLiterals
+    /// Unsupported literal type
+    case unsupportedLiteralType(String)
 
     var description: String {
         switch self {
@@ -326,7 +310,9 @@ enum MacroError: Error, CustomStringConvertible {
         case .noArguments:
             return "@Union requires literal arguments"
         case .noValidLiterals:
-            return "@Union requires at least one valid literal"
+            return "@Union requires at least one valid literal (String, Int, Double, or Bool)"
+        case .unsupportedLiteralType(let type):
+            return "@Union does not support '\(type)' literals. Supported types: String, Int, Double, Bool"
         }
     }
 }
