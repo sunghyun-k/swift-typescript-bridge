@@ -13,6 +13,7 @@ A Swift macro library that brings TypeScript-style union types to Swift, providi
 - 🔒 **Type Safety**: Full compile-time type checking with Swift's type system
 - 📦 **Automatic Codable**: Built-in JSON serialization/deserialization support
 - 🔢 **Multiple Literal Types**: Support for String, Int, Double, and Bool literals
+- 🎯 **Mixed Type Unions**: Combine different literal types (strings, numbers, booleans) in a single union
 - 🌐 **Unicode Support**: Works with any characters including emojis and Swift keywords
 - ⚡ **Zero Runtime Cost**: Fully resolved at compile time using Swift macros
 
@@ -59,6 +60,24 @@ struct APIResponse: Codable {
     let statusCode: StatusCode
     let message: String
 }
+```
+
+### Mixed Type Literal Unions
+
+```swift
+// TypeScript: type ConfigValue = "auto" | 100 | true | 2.5 | "manual" | false
+@Union("auto", 100, true, 2.5, "manual", false) enum ConfigValue {}
+
+struct AppConfig: Codable {
+    let theme: ConfigValue      // Can be "auto" or "manual"
+    let maxItems: ConfigValue   // Can be 100
+    let isEnabled: ConfigValue  // Can be true or false
+    let scale: ConfigValue      // Can be 2.5
+}
+
+// Usage examples:
+let config1 = AppConfig(theme: .`auto`, maxItems: .`100`, isEnabled: .`true`, scale: .`2.5`)
+let config2 = AppConfig(theme: .`manual`, maxItems: .`100`, isEnabled: .`false`, scale: .`2.5`)
 ```
 
 ### Type Unions

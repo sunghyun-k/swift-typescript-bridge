@@ -2,11 +2,12 @@ import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 
-/// A macro implementation that creates union types from string literals.
+/// A macro implementation that creates union types from literal values.
 ///
-/// This macro processes the `@Union("literal1", "literal2", ...)` syntax and generates:
-/// - Enum cases for each string literal (using backticks for special characters)
-/// - Codable conformance with proper serialization/deserialization
+/// This macro processes the `@Union("literal1", 100, true, ...)` syntax and generates:
+/// - Enum cases for each literal value (using backticks for special characters)
+/// - Codable and Equatable conformance with proper serialization/deserialization
+/// - Support for mixed types (String, Int, Double, Bool) in a single union
 /// - Access modifier support based on the enum's access level
 public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
     public static func expansion(

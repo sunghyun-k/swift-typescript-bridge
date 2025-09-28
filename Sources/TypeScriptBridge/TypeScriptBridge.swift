@@ -1,17 +1,36 @@
 import Foundation
 
-/// A macro that creates a union type from string literals, similar to TypeScript's literal union types.
+/// A macro that creates a union type from literal values, similar to TypeScript's literal union types.
 ///
-/// This macro generates enum cases for each provided string literal and implements
-/// `Codable` conformance with proper serialization/deserialization.
+/// This macro generates enum cases for each provided literal and implements
+/// `Codable` and `Equatable` conformance with proper serialization/deserialization.
 ///
-/// - Parameter literals: String literals to create union cases from
+/// - Parameter literals: Literal values (String, Int, Double, Bool) to create union cases from
 ///
 /// ## Usage
 /// ```swift
+/// // String literals
 /// struct Event: Codable {
 ///     @Union("click", "hover", "focus") enum EventType {}
 ///     let type: EventType
+/// }
+///
+/// // Numeric literals
+/// struct Response: Codable {
+///     @Union(200, 404, 500) enum StatusCode {}
+///     let statusCode: StatusCode
+/// }
+///
+/// // Boolean literals
+/// struct Setting: Codable {
+///     @Union(true, false) enum IsEnabled {}
+///     let enabled: IsEnabled
+/// }
+///
+/// // Mixed type literals
+/// struct Config: Codable {
+///     @Union("auto", 100, true, 2.5, "manual", false) enum Value {}
+///     let value: Value
 /// }
 /// ```
 ///
