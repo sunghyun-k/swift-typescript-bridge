@@ -39,7 +39,7 @@ import Foundation
     named(init(from:)),
     named(encode(to:))
 )
-public macro Union(_ literals: String...) = #externalMacro(module: "TypeScriptBridgeMacros", type: "LiteralUnionMacro")
+public macro Union<T: _LiteralType>(_ literals: T...) = #externalMacro(module: "TypeScriptBridgeMacros", type: "LiteralUnionMacro")
 
 /// A macro that creates a union type from Swift types, similar to TypeScript's union types.
 ///
@@ -72,3 +72,9 @@ public macro Union(_ literals: String...) = #externalMacro(module: "TypeScriptBr
 @attached(member, names: arbitrary)
 @attached(extension, conformances: Codable, names: named(init(from:)), named(encode(to:)))
 public macro Union(_ types: Any.Type...) = #externalMacro(module: "TypeScriptBridgeMacros", type: "TypeUnionMacro")
+
+public protocol _LiteralType {}
+extension String: _LiteralType {}
+extension Int: _LiteralType {}
+extension Double: _LiteralType {}
+extension Bool: _LiteralType {}

@@ -25,7 +25,7 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
         let enumCases = literals.map { literal in
             var enumCase = EnumCaseDeclSyntax(
                 elements: EnumCaseElementListSyntax([
-                    EnumCaseElementSyntax(name: .identifier("`\(literal)`"))
+                    EnumCaseElementSyntax(name: .identifier(literal.enumCaseName))
                 ])
             )
 
@@ -57,28 +57,32 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
         let accessModifier = extractAccessModifier(from: enumDecl)
         let accessPrefix = accessModifier != nil ? "\(accessModifier!) " : ""
 
+        // Get the Swift type for the literal values
+        // If mixed types, use the most general compatible type
+        let literalType = determineLiteralType(from: literals)
+
         let rawValueCases =
             literals.map { literal in
-                "case .`\(literal)`: return \"\(literal)\""
+                "case .\(literal.enumCaseName): return \(literal.swiftLiteral(as: literalType))"
             }
             .joined(separator: "\n")
 
         let initCases =
             literals.map { literal in
-                "case \"\(literal)\": self = .`\(literal)`"
+                "case \(literal.swiftLiteral(as: literalType)): self = .\(literal.enumCaseName)"
             }
             .joined(separator: "\n")
 
         let extensionDecl = try ExtensionDeclSyntax(
             """
             extension \(type.trimmed): Codable {
-                \(raw: accessPrefix)var rawValue: String {
+                \(raw: accessPrefix)var rawValue: \(raw: literalType) {
                     switch self {
                     \(raw: rawValueCases)
                     }
                 }
                 
-                \(raw: accessPrefix)init?(rawValue: String) {
+                \(raw: accessPrefix)init?(rawValue: \(raw: literalType)) {
                     switch rawValue {
                     \(raw: initCases)
                     default: return nil
@@ -87,7 +91,7 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
                 
                 \(raw: accessPrefix)init(from decoder: Decoder) throws {
                     let container = try decoder.singleValueContainer()
-                    let rawValue = try container.decode(String.self)
+                    let rawValue = try container.decode(\(raw: literalType).self)
                     guard let value = Self(rawValue: rawValue) else {
                         throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid value"))
                     }
@@ -105,18 +109,31 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
         return [extensionDecl]
     }
 
-    private static func extractLiterals(from node: AttributeSyntax) throws -> [String] {
+    private static func extractLiterals(from node: AttributeSyntax) throws -> [LiteralValue] {
         guard let arguments = node.arguments?.as(LabeledExprListSyntax.self) else {
             throw MacroError.noArguments
         }
 
-        var literals: [String] = []
+        var literals: [LiteralValue] = []
 
         for argument in arguments {
             if let stringLiteral = argument.expression.as(StringLiteralExprSyntax.self),
                 let segment = stringLiteral.segments.first?.as(StringSegmentSyntax.self)
             {
-                literals.append(segment.content.text)
+                literals.append(.string(segment.content.text))
+            } else if let intLiteral = argument.expression.as(IntegerLiteralExprSyntax.self) {
+                guard let intValue = Int(intLiteral.literal.text) else {
+                    continue
+                }
+                literals.append(.int(intValue))
+            } else if let floatLiteral = argument.expression.as(FloatLiteralExprSyntax.self) {
+                guard let doubleValue = Double(floatLiteral.literal.text) else {
+                    continue
+                }
+                literals.append(.double(doubleValue))
+            } else if let boolLiteral = argument.expression.as(BooleanLiteralExprSyntax.self) {
+                let boolValue = boolLiteral.literal.tokenKind == .keyword(.true)
+                literals.append(.bool(boolValue))
             }
         }
 
@@ -125,6 +142,23 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
         }
 
         return literals
+    }
+
+    private static func determineLiteralType(from literals: [LiteralValue]) -> String {
+        let types = Set(literals.map { $0.swiftTypeName })
+        
+        // If all same type, use that type
+        if types.count == 1 {
+            return types.first!
+        }
+        
+        // If mixed Int and Double, use Double (more general)
+        if types.contains("Int") && types.contains("Double") {
+            return "Double"
+        }
+        
+        // If multiple different types, default to String representation
+        return "String"
     }
 
     private static func extractAccessModifier(from enumDecl: EnumDeclSyntax) -> Keyword? {
@@ -148,13 +182,91 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
     }
 }
 
+/// Represents different types of literal values that can be used in union types
+enum LiteralValue {
+    case string(String)
+    case int(Int)
+    case double(Double)
+    case bool(Bool)
+    
+    /// Returns the Swift literal representation of this value
+    var swiftLiteral: String {
+        switch self {
+        case .string(let value):
+            return "\"\(value)\""
+        case .int(let value):
+            return "\(value)"
+        case .double(let value):
+            return "\(value)"
+        case .bool(let value):
+            return "\(value)"
+        }
+    }
+    
+    /// Returns the Swift literal representation converted to target type
+    func swiftLiteral(as targetType: String) -> String {
+        switch targetType {
+        case "Double":
+            switch self {
+            case .int(let value):
+                return "\(Double(value))"
+            case .double(let value):
+                return "\(value)"
+            default:
+                return swiftLiteral
+            }
+        case "String":
+            switch self {
+            case .string(let value):
+                return "\"\(value)\""
+            case .int(let value):
+                return "\"\(value)\""
+            case .double(let value):
+                return "\"\(value)\""
+            case .bool(let value):
+                return "\"\(value)\""
+            }
+        default:
+            return swiftLiteral
+        }
+    }
+    
+    /// Returns the enum case name for this literal
+    var enumCaseName: String {
+        switch self {
+        case .string(let value):
+            return "`\(value)`"
+        case .int(let value):
+            return "`\(value)`"
+        case .double(let value):
+            return "`\(value)`"
+        case .bool(let value):
+            return "`\(value)`"
+        }
+    }
+    
+    /// Returns the underlying Swift type name
+    var swiftTypeName: String {
+        switch self {
+        case .string:
+            return "String"
+        case .int:
+            return "Int"
+        case .double:
+            return "Double"
+        case .bool:
+            return "Bool"
+        }
+    }
+}
+
 /// Errors that can occur during literal union macro expansion.
 enum MacroError: Error, CustomStringConvertible {
     /// The macro was applied to a non-enum declaration
     case invalidDeclaration
     /// No arguments were provided to the macro
     case noArguments
-    /// No valid string literals were found in the arguments
+    /// No valid literals were found in the arguments
     case noValidLiterals
 
     var description: String {
@@ -162,9 +274,9 @@ enum MacroError: Error, CustomStringConvertible {
         case .invalidDeclaration:
             return "@Union can only be applied to enum declarations"
         case .noArguments:
-            return "@Union requires string literal arguments"
+            return "@Union requires literal arguments"
         case .noValidLiterals:
-            return "@Union requires at least one valid string literal"
+            return "@Union requires at least one valid literal"
         }
     }
 }

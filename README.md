@@ -12,6 +12,7 @@ A Swift macro library that brings TypeScript-style union types to Swift, providi
 - 🚀 **TypeScript-like Union Types**: Create union types similar to TypeScript's literal and type unions
 - 🔒 **Type Safety**: Full compile-time type checking with Swift's type system
 - 📦 **Automatic Codable**: Built-in JSON serialization/deserialization support
+- 🔢 **Multiple Literal Types**: Support for String, Int, Double, and Bool literals
 - 🌐 **Unicode Support**: Works with any characters including emojis and Swift keywords
 - ⚡ **Zero Runtime Cost**: Fully resolved at compile time using Swift macros
 
@@ -45,6 +46,33 @@ struct Event: Codable {
 let event = Event(type: .click, timestamp: Date())
 ```
 
+### Numeric Literal Unions
+
+```swift
+// TypeScript: type StatusCode = 200 | 404 | 500
+@Union(200, 404, 500) enum StatusCode {}
+
+// TypeScript: type Version = 1.0 | 2.0 | 3.0
+@Union(1.0, 2.0, 3.0) enum Version {}
+
+struct APIResponse: Codable {
+    let statusCode: StatusCode
+    let message: String
+}
+```
+
+### Boolean Literal Unions
+
+```swift
+// TypeScript: type Flag = true | false
+@Union(true, false) enum Flag {}
+
+struct FeatureFlag: Codable {
+    let enabled: Flag
+    let feature: String
+}
+```
+
 ### Type Unions
 
 ```swift
@@ -60,6 +88,9 @@ let entity = Entity.User(user)
 | TypeScript | Swift TypeScript Bridge |
 |------------|-------------------------|
 | `type EventType = "click" \| "hover"` | `@Union("click", "hover") enum EventType {}` |
+| `type StatusCode = 200 \| 404 \| 500` | `@Union(200, 404, 500) enum StatusCode {}` |
+| `type Version = 1.0 \| 2.0 \| 3.0` | `@Union(1.0, 2.0, 3.0) enum Version {}` |
+| `type Flag = true \| false` | `@Union(true, false) enum Flag {}` |
 | `type Entity = User \| Organization` | `@Union(User.self, Organization.self) enum Entity {}` |
 | Automatic JSON handling | Automatic Codable conformance |
 | Runtime type checking | Compile-time type safety |

@@ -151,6 +151,115 @@ struct MultiOptionEvent: Codable {
     }
 }
 
+struct A: Codable {}
+
+// MARK: - Numeric and Boolean Literal Union Tests
+
+struct HTTPResponse: Codable {
+    @Union(200, 404, 500) enum StatusCode {}
+    let statusCode: StatusCode
+    let message: String
+}
+
+struct GameConfig: Codable {
+    @Union(1.0, 1.5, 2.0) enum DifficultyMultiplier {}
+    let difficulty: DifficultyMultiplier
+    let playerName: String
+}
+
+struct FeatureFlag: Codable {
+    @Union(true, false) enum Enabled {}
+    let enabled: Enabled
+    let feature: String
+}
+
+@Test func testIntLiteralUnion() async throws {
+    let response = HTTPResponse(statusCode: .`200`, message: "Success")
+    
+    let encoder = JSONEncoder()
+    let data = try encoder.encode(response)
+    
+    let decoder = JSONDecoder()
+    let decoded = try decoder.decode(HTTPResponse.self, from: data)
+    
+    #expect(decoded.statusCode.rawValue == 200)
+    #expect(decoded.message == "Success")
+}
+
+@Test func testDoubleLiteralUnion() async throws {
+    let config = GameConfig(difficulty: .`1.5`, playerName: "Alice")
+    
+    let encoder = JSONEncoder()
+    let data = try encoder.encode(config)
+    
+    let decoder = JSONDecoder()
+    let decoded = try decoder.decode(GameConfig.self, from: data)
+    
+    #expect(decoded.difficulty.rawValue == 1.5)
+    #expect(decoded.playerName == "Alice")
+}
+
+@Test func testBoolLiteralUnion() async throws {
+    let flag = FeatureFlag(enabled: .`true`, feature: "newUI")
+    
+    let encoder = JSONEncoder()
+    let data = try encoder.encode(flag)
+    
+    let decoder = JSONDecoder()
+    let decoded = try decoder.decode(FeatureFlag.self, from: data)
+    
+    #expect(decoded.enabled.rawValue == true)
+    #expect(decoded.feature == "newUI")
+}
+
+@Test func testNumericLiteralUnionJSON() async throws {
+    let jsonString = """
+        {
+            "statusCode": 404,
+            "message": "Not Found"
+        }
+        """
+    
+    let data = jsonString.data(using: .utf8)!
+    let decoder = JSONDecoder()
+    let response = try decoder.decode(HTTPResponse.self, from: data)
+    
+    #expect(response.statusCode.rawValue == 404)
+    #expect(response.message == "Not Found")
+}
+
+@Test func testDoubleLiteralUnionJSON() async throws {
+    let jsonString = """
+        {
+            "difficulty": 2.0,
+            "playerName": "Bob"
+        }
+        """
+    
+    let data = jsonString.data(using: .utf8)!
+    let decoder = JSONDecoder()
+    let config = try decoder.decode(GameConfig.self, from: data)
+    
+    #expect(config.difficulty.rawValue == 2.0)
+    #expect(config.playerName == "Bob")
+}
+
+@Test func testBoolLiteralUnionJSON() async throws {
+    let jsonString = """
+        {
+            "enabled": false,
+            "feature": "experimentalMode"
+        }
+        """
+    
+    let data = jsonString.data(using: .utf8)!
+    let decoder = JSONDecoder()
+    let flag = try decoder.decode(FeatureFlag.self, from: data)
+    
+    #expect(flag.enabled.rawValue == false)
+    #expect(flag.feature == "experimentalMode")
+}
+
 // MARK: - Enum with Associated Values in Union
 
 struct MediaEvent: Codable {
