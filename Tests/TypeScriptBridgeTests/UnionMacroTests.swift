@@ -260,6 +260,81 @@ struct FeatureFlag: Codable {
     #expect(flag.feature == "experimentalMode")
 }
 
+// MARK: - Mixed Type Literal Union Tests
+
+struct MixedTypeConfig: Codable {
+    @Union("auto", 100, true, 2.5, "manual", false) enum Value {}
+    let value: Value
+    let name: String
+}
+
+@Test func testMixedTypeLiteralUnion() async throws {
+    let configs = [
+        MixedTypeConfig(value: .`auto`, name: "stringValue"),
+        MixedTypeConfig(value: .`100`, name: "intValue"),
+        MixedTypeConfig(value: .`true`, name: "boolValue"),
+        MixedTypeConfig(value: .`2.5`, name: "doubleValue"),
+        MixedTypeConfig(value: .`manual`, name: "anotherString"),
+        MixedTypeConfig(value: .`false`, name: "anotherBool")
+    ]
+    
+    let encoder = JSONEncoder()
+    let decoder = JSONDecoder()
+    
+    for config in configs {
+        let data = try encoder.encode(config)
+        let decoded = try decoder.decode(MixedTypeConfig.self, from: data)
+        
+        // Compare enum cases instead of rawValues for mixed types
+        #expect(decoded.value == config.value)
+        #expect(decoded.name == config.name)
+    }
+}
+
+@Test func testMixedTypeLiteralUnionJSON() async throws {
+    let testCases: [(json: String, expectedCase: MixedTypeConfig.Value)] = [
+        ("""
+        {
+            "value": "auto",
+            "name": "stringValue"
+        }
+        """, .`auto`),
+        ("""
+        {
+            "value": 100,
+            "name": "intValue"
+        }
+        """, .`100`),
+        ("""
+        {
+            "value": true,
+            "name": "boolValue"
+        }
+        """, .`true`),
+        ("""
+        {
+            "value": 2.5,
+            "name": "doubleValue"
+        }
+        """, .`2.5`),
+        ("""
+        {
+            "value": false,
+            "name": "anotherBool"
+        }
+        """, .`false`)
+    ]
+    
+    let decoder = JSONDecoder()
+    
+    for testCase in testCases {
+        let data = testCase.json.data(using: .utf8)!
+        let config = try decoder.decode(MixedTypeConfig.self, from: data)
+        
+        #expect(config.value == testCase.expectedCase)
+    }
+}
+
 // MARK: - Enum with Associated Values in Union
 
 struct MediaEvent: Codable {

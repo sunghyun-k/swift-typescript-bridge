@@ -58,55 +58,106 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
         let accessPrefix = accessModifier != nil ? "\(accessModifier!) " : ""
 
         // Get the Swift type for the literal values
-        // If mixed types, use the most general compatible type
         let literalType = determineLiteralType(from: literals)
+        let isMixedType = literalType == "any _LiteralType"
 
-        let rawValueCases =
-            literals.map { literal in
-                "case .\(literal.enumCaseName): return \(literal.swiftLiteral(as: literalType))"
-            }
-            .joined(separator: "\n")
-
-        let initCases =
-            literals.map { literal in
-                "case \(literal.swiftLiteral(as: literalType)): self = .\(literal.enumCaseName)"
-            }
-            .joined(separator: "\n")
-
-        let extensionDecl = try ExtensionDeclSyntax(
-            """
-            extension \(type.trimmed): Codable {
-                \(raw: accessPrefix)var rawValue: \(raw: literalType) {
-                    switch self {
-                    \(raw: rawValueCases)
-                    }
+        if isMixedType {
+            // For mixed types, generate specialized handling
+            let rawValueCases =
+                literals.map { literal in
+                    "case .\(literal.enumCaseName): return \(literal.swiftLiteral)"
                 }
-                
-                \(raw: accessPrefix)init?(rawValue: \(raw: literalType)) {
-                    switch rawValue {
-                    \(raw: initCases)
-                    default: return nil
-                    }
+                .joined(separator: "\n")
+
+            let initCases =
+                literals.map { literal in
+                    let swiftValue = literal.swiftLiteral
+                    return "if let value = rawValue as? \(literal.swiftTypeName), value == \(swiftValue) { self = .\(literal.enumCaseName); return }"
                 }
-                
-                \(raw: accessPrefix)init(from decoder: Decoder) throws {
-                    let container = try decoder.singleValueContainer()
-                    let rawValue = try container.decode(\(raw: literalType).self)
-                    guard let value = Self(rawValue: rawValue) else {
+                .joined(separator: "\n")
+
+            let decodingCases = 
+                literals.map { literal in
+                    "if let value = try? container.decode(\(literal.swiftTypeName).self), value == \(literal.swiftLiteral) { self = .\(literal.enumCaseName); return }"
+                }
+                .joined(separator: "\n")
+
+            let extensionDecl = try ExtensionDeclSyntax(
+                """
+                extension \(type.trimmed): Codable, Equatable {
+                    \(raw: accessPrefix)var rawValue: any _LiteralType {
+                        switch self {
+                        \(raw: rawValueCases)
+                        }
+                    }
+                    
+                    \(raw: accessPrefix)init?(rawValue: any _LiteralType) {
+                        \(raw: initCases)
+                        return nil
+                    }
+                    
+                    \(raw: accessPrefix)init(from decoder: Decoder) throws {
+                        let container = try decoder.singleValueContainer()
+                        \(raw: decodingCases)
                         throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid value"))
                     }
-                    self = value
+                    
+                    \(raw: accessPrefix)func encode(to encoder: Encoder) throws {
+                        var container = encoder.singleValueContainer()
+                        try container.encode(rawValue)
+                    }
                 }
-                
-                \(raw: accessPrefix)func encode(to encoder: Encoder) throws {
-                    var container = encoder.singleValueContainer()
-                    try container.encode(rawValue)
+                """
+            )
+            return [extensionDecl]
+        } else {
+            // For homogeneous types, use the existing approach
+            let rawValueCases =
+                literals.map { literal in
+                    "case .\(literal.enumCaseName): return \(literal.swiftLiteral(as: literalType))"
                 }
-            }
-            """
-        )
+                .joined(separator: "\n")
 
-        return [extensionDecl]
+            let initCases =
+                literals.map { literal in
+                    "case \(literal.swiftLiteral(as: literalType)): self = .\(literal.enumCaseName)"
+                }
+                .joined(separator: "\n")
+
+            let extensionDecl = try ExtensionDeclSyntax(
+                """
+                extension \(type.trimmed): Codable, Equatable {
+                    \(raw: accessPrefix)var rawValue: \(raw: literalType) {
+                        switch self {
+                        \(raw: rawValueCases)
+                        }
+                    }
+                    
+                    \(raw: accessPrefix)init?(rawValue: \(raw: literalType)) {
+                        switch rawValue {
+                        \(raw: initCases)
+                        default: return nil
+                        }
+                    }
+                    
+                    \(raw: accessPrefix)init(from decoder: Decoder) throws {
+                        let container = try decoder.singleValueContainer()
+                        let rawValue = try container.decode(\(raw: literalType).self)
+                        guard let value = Self(rawValue: rawValue) else {
+                            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid value"))
+                        }
+                        self = value
+                    }
+                    
+                    \(raw: accessPrefix)func encode(to encoder: Encoder) throws {
+                        var container = encoder.singleValueContainer()
+                        try container.encode(rawValue)
+                    }
+                }
+                """
+            )
+            return [extensionDecl]
+        }
     }
 
     private static func extractLiterals(from node: AttributeSyntax) throws -> [LiteralValue] {
@@ -152,13 +203,8 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
             return types.first!
         }
         
-        // If mixed Int and Double, use Double (more general)
-        if types.contains("Int") && types.contains("Double") {
-            return "Double"
-        }
-        
-        // If multiple different types, default to String representation
-        return "String"
+        // For mixed types, use any _LiteralType to support all literal types
+        return "any _LiteralType"
     }
 
     private static func extractAccessModifier(from enumDecl: EnumDeclSyntax) -> Keyword? {
@@ -226,6 +272,9 @@ enum LiteralValue {
             case .bool(let value):
                 return "\"\(value)\""
             }
+        case "any _LiteralType":
+            // For mixed types, return the literal as-is to preserve the original type
+            return swiftLiteral
         default:
             return swiftLiteral
         }
