@@ -61,18 +61,6 @@ struct APIResponse: Codable {
 }
 ```
 
-### Boolean Literal Unions
-
-```swift
-// TypeScript: type Flag = true | false
-@Union(true, false) enum Flag {}
-
-struct FeatureFlag: Codable {
-    let enabled: Flag
-    let feature: String
-}
-```
-
 ### Type Unions
 
 ```swift
@@ -83,17 +71,142 @@ let user = User(name: "Alice", email: "alice@example.com")
 let entity = Entity.User(user)
 ```
 
-## TypeScript Comparison
+## Advanced Usage
 
-| TypeScript | Swift TypeScript Bridge |
-|------------|-------------------------|
-| `type EventType = "click" \| "hover"` | `@Union("click", "hover") enum EventType {}` |
-| `type StatusCode = 200 \| 404 \| 500` | `@Union(200, 404, 500) enum StatusCode {}` |
-| `type Version = 1.0 \| 2.0 \| 3.0` | `@Union(1.0, 2.0, 3.0) enum Version {}` |
-| `type Flag = true \| false` | `@Union(true, false) enum Flag {}` |
-| `type Entity = User \| Organization` | `@Union(User.self, Organization.self) enum Entity {}` |
-| Automatic JSON handling | Automatic Codable conformance |
-| Runtime type checking | Compile-time type safety |
+### Web Analytics Events
+
+```typescript
+// TypeScript - Frontend analytics events
+interface PageViewEvent {
+    event: "page_view";
+    page: string;
+    referrer?: string;
+}
+
+interface UserActionEvent {
+    event: "click" | "hover" | "focus" | "scroll";
+    element: string;
+    timestamp: number;
+}
+
+interface ConversionEvent {
+    event: "purchase" | "signup" | "download";
+    value: number;
+    currency: "USD" | "EUR" | "GBP";
+}
+
+type WebEvent = PageViewEvent | UserActionEvent | ConversionEvent;
+```
+
+```swift
+// Swift TypeScript Bridge - Parse analytics from web frontend
+struct PageViewEvent: Codable {
+    @Union("page_view") enum EventType {}
+    let event: EventType
+    let page: String
+    let referrer: String?
+}
+
+struct UserActionEvent: Codable {
+    @Union("click", "hover", "focus", "scroll") enum EventType {}
+    let event: EventType
+    let element: String
+    let timestamp: Double
+}
+
+struct ConversionEvent: Codable {
+    @Union("purchase", "signup", "download") enum EventType {}
+    let event: EventType
+    let value: Double
+    @Union("USD", "EUR", "GBP") enum Currency {}
+    let currency: Currency
+}
+
+@Union(PageViewEvent.self, UserActionEvent.self, ConversionEvent.self) enum WebEvent {}
+
+// JSON Parsing from web analytics
+let analyticsJson = """
+{
+    "event": "click",
+    "element": "checkout-button",
+    "timestamp": 1640995200
+}
+"""
+
+let userAction = try JSONDecoder().decode(WebEvent.self, from: analyticsJson.data(using: .utf8)!)
+```
+
+### API Response Discrimination
+
+```typescript
+// TypeScript - Discriminated union for API responses
+interface SuccessResponse {
+    status: "success";
+    data: {
+        id: string;
+        name: string;
+    };
+}
+
+interface ErrorResponse {
+    status: "error";
+    error: {
+        code: string;
+        message: string;
+    };
+}
+
+type ApiResponse = SuccessResponse | ErrorResponse;
+```
+
+```swift
+// Swift TypeScript Bridge - Parse discriminated API responses
+struct SuccessResponse: Codable {
+    @Union("success") enum Status {}
+    let status: Status
+    struct SuccessData: Codable {
+        let id: String
+        let name: String
+    }
+    let data: SuccessData
+}
+
+struct ErrorResponse: Codable {
+    @Union("error") enum Status {}
+    let status: Status
+    struct ErrorData: Codable {
+        let code: String
+        let message: String
+    }
+    let error: ErrorData
+}
+
+@Union(SuccessResponse.self, ErrorResponse.self) enum ApiResponse {}
+
+// JSON Parsing from REST API
+let successJson = """
+{
+    "status": "success",
+    "data": {
+        "id": "user_123",
+        "name": "John Doe"
+    }
+}
+"""
+
+let errorJson = """
+{
+    "status": "error",
+    "error": {
+        "code": "INVALID_TOKEN",
+        "message": "Authentication token is invalid"
+    }
+}
+"""
+
+let successResponse = try JSONDecoder().decode(SuccessResponse.self, from: successJson.data(using: .utf8)!)
+let errorResponse = try JSONDecoder().decode(ErrorResponse.self, from: errorJson.data(using: .utf8)!)
+```
 
 ## Requirements
 
