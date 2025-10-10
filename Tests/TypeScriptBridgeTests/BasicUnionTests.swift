@@ -38,17 +38,14 @@ struct BasicKeyboardEvent: Codable {
     let clickEvent = BasicClickEvent(type: .click, coordinates: ["100", "200"])
     let uiEvent = BasicUIEvent.BasicClickEvent(clickEvent)
 
-    let encoder = JSONEncoder()
-    let data = try encoder.encode(uiEvent)
-
-    let decoder = JSONDecoder()
-    let decodedEvent = try decoder.decode(BasicUIEvent.self, from: data)
+    let data = try encodeToJSON(uiEvent)
+    let decodedEvent = try decodeFromJSON(BasicUIEvent.self, from: data)
 
     switch decodedEvent {
     case .BasicClickEvent(let event):
         #expect(event.coordinates == ["100", "200"])
     case .BasicKeyboardEvent:
-        #expect(Bool(false), "Expected click event")
+        Issue.record("Expected BasicClickEvent, got BasicKeyboardEvent")
     }
 }
 
@@ -56,17 +53,14 @@ struct BasicKeyboardEvent: Codable {
     let keyboardEvent = BasicKeyboardEvent(type: .keydown, key: "Enter")
     let uiEvent = BasicUIEvent.BasicKeyboardEvent(keyboardEvent)
 
-    let encoder = JSONEncoder()
-    let data = try encoder.encode(uiEvent)
-
-    let decoder = JSONDecoder()
-    let decodedEvent = try decoder.decode(BasicUIEvent.self, from: data)
+    let data = try encodeToJSON(uiEvent)
+    let decodedEvent = try decodeFromJSON(BasicUIEvent.self, from: data)
 
     switch decodedEvent {
     case .BasicKeyboardEvent(let event):
         #expect(event.key == "Enter")
     case .BasicClickEvent:
-        #expect(Bool(false), "Expected keyboard event")
+        Issue.record("Expected BasicKeyboardEvent, got BasicClickEvent")
     }
 }
 
@@ -78,9 +72,7 @@ struct BasicKeyboardEvent: Codable {
         }
         """
 
-    let data = jsonString.data(using: .utf8)!
-    let decoder = JSONDecoder()
-    let clickEvent = try decoder.decode(BasicClickEvent.self, from: data)
+    let clickEvent = try decodeFromJSON(BasicClickEvent.self, from: jsonString)
 
     #expect(clickEvent.type.rawValue == "click")
     #expect(clickEvent.coordinates == ["150", "300"])
@@ -101,30 +93,26 @@ struct BasicKeyboardEvent: Codable {
         }
         """
 
-    let decoder = JSONDecoder()
-
     // Click Event 테스트
-    let clickData = clickEventJSON.data(using: .utf8)!
-    let clickUIEvent = try decoder.decode(BasicUIEvent.self, from: clickData)
+    let clickUIEvent = try decodeFromJSON(BasicUIEvent.self, from: clickEventJSON)
 
     switch clickUIEvent {
     case .BasicClickEvent(let event):
         #expect(event.type.rawValue == "click")
         #expect(event.coordinates == ["100", "200"])
     case .BasicKeyboardEvent:
-        #expect(Bool(false), "Expected click event")
+        Issue.record("Expected BasicClickEvent, got BasicKeyboardEvent")
     }
 
     // Keyboard Event 테스트
-    let keyboardData = keyboardEventJSON.data(using: .utf8)!
-    let keyboardUIEvent = try decoder.decode(BasicUIEvent.self, from: keyboardData)
+    let keyboardUIEvent = try decodeFromJSON(BasicUIEvent.self, from: keyboardEventJSON)
 
     switch keyboardUIEvent {
     case .BasicKeyboardEvent(let event):
         #expect(event.type.rawValue == "keyup")
         #expect(event.key == "Escape")
     case .BasicClickEvent:
-        #expect(Bool(false), "Expected keyboard event")
+        Issue.record("Expected BasicKeyboardEvent, got BasicClickEvent")
     }
 }
 
@@ -176,17 +164,14 @@ struct SimpleB: Codable {
         }
         """
 
-    let decoder = JSONDecoder()
-
     // Should decode as SimpleA (first match)
-    let dataA = simpleAJSON.data(using: .utf8)!
-    let unionA = try decoder.decode(SimpleUnion.self, from: dataA)
+    let unionA = try decodeFromJSON(SimpleUnion.self, from: simpleAJSON)
 
     switch unionA {
     case .SimpleA(let event):
         #expect(event.value == "test")
     case .SimpleB:
-        #expect(Bool(false), "Should decode as SimpleA")
+        Issue.record("Should decode as SimpleA (first matching type)")
     }
 
     // Note: SimpleB with extra fields will still decode as SimpleA because
@@ -199,8 +184,7 @@ struct SimpleB: Codable {
         }
         """
 
-    let dataB = simpleBJSON.data(using: .utf8)!
-    let unionB = try decoder.decode(SimpleUnion.self, from: dataB)
+    let unionB = try decodeFromJSON(SimpleUnion.self, from: simpleBJSON)
 
     // Will decode as SimpleA due to first-match behavior
     switch unionB {
@@ -208,6 +192,6 @@ struct SimpleB: Codable {
         #expect(event.value == "test")
     case .SimpleB:
         // SimpleB would only be selected if SimpleA failed to decode
-        #expect(Bool(false), "Decoded as SimpleB (unexpected but valid)")
+        Issue.record("Decoded as SimpleB (unexpected but valid)")
     }
 }
