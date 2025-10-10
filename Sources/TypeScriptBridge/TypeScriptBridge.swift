@@ -113,19 +113,19 @@ public macro Union(_ types: Any.Type...) = #externalMacro(module: "TypeScriptBri
 /// @Union(ClickEvent.self, KeyboardEvent.self)
 /// enum UIEvent {}
 /// ```
-@attached(extension, conformances: TypeDiscriminated, names: named(discriminatorKey), named(discriminatorValues))
+@attached(extension, conformances: TypeDiscriminated, names: named(DiscriminatorType), named(discriminatorKey))
 public macro UnionDiscriminator(_ property: String) =
     #externalMacro(module: "TypeScriptBridgeMacros", type: "UnionDiscriminatorMacro")
 
 /// Protocol for types that can be discriminated in a union by a specific field value.
 ///
 /// Types conforming to this protocol provide information about which field
-/// and which values identify them in a discriminated union.
+/// and which type identify them in a discriminated union.
 public protocol TypeDiscriminated {
+    /// The type of the discriminator field (e.g., EventType enum)
+    associatedtype DiscriminatorType: Decodable, Equatable
     /// The name of the field used for discrimination (e.g., "type")
     static var discriminatorKey: String { get }
-    /// The possible values of the discriminator field for this type (e.g., ["click"])
-    static var discriminatorValues: [String] { get }
 }
 
 public protocol _LiteralType: Codable, Equatable {}

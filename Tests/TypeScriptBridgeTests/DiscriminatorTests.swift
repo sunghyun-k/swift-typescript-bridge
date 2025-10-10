@@ -129,18 +129,16 @@ struct TextEvent: Codable {
 @Test func testTypeDiscriminatedProtocol() async throws {
     // Verify that TypeDiscriminator macro generates correct protocol conformance
     #expect(DiscClickEvent.discriminatorKey == "type")
-    #expect(DiscClickEvent.discriminatorValues == ["click"])
+    #expect(DiscClickEvent.DiscriminatorType.self == DiscClickEvent.EventType.self)
 
     #expect(DiscKeyboardEvent.discriminatorKey == "type")
-    #expect(DiscKeyboardEvent.discriminatorValues.contains("keydown"))
-    #expect(DiscKeyboardEvent.discriminatorValues.contains("keyup"))
-    #expect(DiscKeyboardEvent.discriminatorValues.count == 2)
+    #expect(DiscKeyboardEvent.DiscriminatorType.self == DiscKeyboardEvent.EventType.self)
 
     #expect(MediaEvent.discriminatorKey == "type")
-    #expect(MediaEvent.discriminatorValues == ["image", "video", "audio", "document"])
+    #expect(MediaEvent.DiscriminatorType.self == MediaEvent.MediaType.self)
 
     #expect(TextEvent.discriminatorKey == "format")
-    #expect(TextEvent.discriminatorValues == ["plain", "markdown", "html"])
+    #expect(TextEvent.DiscriminatorType.self == TextEvent.Format.self)
 }
 
 @Test func testContentEventWithMetadata() async throws {

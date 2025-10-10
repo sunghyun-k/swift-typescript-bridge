@@ -30,20 +30,15 @@ public struct UnionDiscriminatorMacro: ExtensionMacro {
             throw UnionDiscriminatorError.fieldNotFound(keyFieldName)
         }
 
-        // Find the enum declaration for this field type
-        guard let enumDecl = findEnumDeclaration(named: fieldType, in: structDecl) else {
+        // Verify that the enum declaration exists for this field type
+        guard findEnumDeclaration(named: fieldType, in: structDecl) != nil else {
             throw UnionDiscriminatorError.enumNotFound(fieldType)
         }
 
-        // Extract discriminator values from @Union attribute
-        let discriminatorValues = try extractDiscriminatorValues(from: enumDecl)
-
-        // Generate the extension
-        let valuesArrayLiteral = discriminatorValues.map { "\"\($0)\"" }.joined(separator: ", ")
-
+        // Generate the extension with DiscriminatorType typealias
         let extensionDecl = try ExtensionDeclSyntax("extension \(type.trimmed): TypeDiscriminated") {
+            "typealias DiscriminatorType = \(raw: fieldType)"
             "static let discriminatorKey = \"\(raw: keyFieldName)\""
-            "static let discriminatorValues = [\(raw: valuesArrayLiteral)]"
         }
 
         return [extensionDecl]
@@ -107,49 +102,6 @@ public struct UnionDiscriminatorMacro: ExtensionMacro {
         return nil
     }
 
-    /// Extracts discriminator values from an enum's @Union attribute
-    private static func extractDiscriminatorValues(from enumDecl: EnumDeclSyntax) throws -> [String] {
-        // Find the @Union attribute
-        for attribute in enumDecl.attributes {
-            if let customAttr = attribute.as(AttributeSyntax.self),
-                let identifierType = customAttr.attributeName.as(IdentifierTypeSyntax.self),
-                identifierType.name.text == "Union"
-            {
-
-                // Extract literal arguments
-                guard let arguments = customAttr.arguments?.as(LabeledExprListSyntax.self) else {
-                    throw UnionDiscriminatorError.noUnionArguments
-                }
-
-                var values: [String] = []
-
-                for argument in arguments {
-                    if let stringLiteral = argument.expression.as(StringLiteralExprSyntax.self) {
-                        // Extract string literal value
-                        for segment in stringLiteral.segments {
-                            if let stringSegment = segment.as(StringSegmentSyntax.self) {
-                                values.append(stringSegment.content.text)
-                            }
-                        }
-                    } else if let intLiteral = argument.expression.as(IntegerLiteralExprSyntax.self) {
-                        values.append(intLiteral.literal.text)
-                    } else if let floatLiteral = argument.expression.as(FloatLiteralExprSyntax.self) {
-                        values.append(floatLiteral.literal.text)
-                    } else if let boolLiteral = argument.expression.as(BooleanLiteralExprSyntax.self) {
-                        values.append(boolLiteral.literal.text)
-                    }
-                }
-
-                if values.isEmpty {
-                    throw UnionDiscriminatorError.noValidUnionValues
-                }
-
-                return values
-            }
-        }
-
-        throw UnionDiscriminatorError.missingUnionAttribute
-    }
 }
 
 /// Errors that can occur during union discriminator macro expansion.
@@ -160,9 +112,6 @@ enum UnionDiscriminatorError: Error, CustomStringConvertible {
     case unexpectedLabel
     case fieldNotFound(String)
     case enumNotFound(String)
-    case missingUnionAttribute
-    case noUnionArguments
-    case noValidUnionValues
 
     var description: String {
         switch self {
@@ -179,12 +128,6 @@ enum UnionDiscriminatorError: Error, CustomStringConvertible {
             return "Property '\(name)' not found in struct"
         case .enumNotFound(let name):
             return "Enum type '\(name)' not found in struct"
-        case .missingUnionAttribute:
-            return "The discriminator property's enum must have a @Union attribute"
-        case .noUnionArguments:
-            return "@Union attribute must have literal arguments"
-        case .noValidUnionValues:
-            return "No valid literal values found in @Union attribute"
         }
     }
 }
