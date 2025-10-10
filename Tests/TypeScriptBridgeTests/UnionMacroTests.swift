@@ -4,12 +4,14 @@ import Foundation
 
 // MARK: - Basic Test Types
 
+@TypeDiscriminator(field: "type")
 struct ClickEvent: Codable {
     @Union("click") enum EventType {}
     let type: EventType
     var coordinates: [String]
 }
 
+@TypeDiscriminator(field: "type")
 struct KeyboardEvent: Codable {
     @Union("keydown", "keyup") enum EventType {}
     let type: EventType
@@ -337,6 +339,7 @@ struct MixedTypeConfig: Codable {
 
 // MARK: - Enum with Associated Values in Union
 
+@TypeDiscriminator(field: "type")
 struct MediaEvent: Codable {
     @Union("image", "video", "audio", "document") enum MediaType {}
     let type: MediaType
@@ -344,6 +347,7 @@ struct MediaEvent: Codable {
     let metadata: [String: String]?
 }
 
+@TypeDiscriminator(field: "format")
 struct TextEvent: Codable {
     @Union("plain", "markdown", "html") enum Format {}
     let format: Format
@@ -401,5 +405,169 @@ struct TextEvent: Codable {
         #expect(event.length == 25)
     case .MediaEvent:
         #expect(Bool(false), "Expected TextEvent")
+    }
+}
+
+// MARK: - Discriminator-specific Tests
+
+@Test func testDiscriminatorBasedDecoding() async throws {
+    // Test that discriminator-based decoding works correctly
+    let clickJSON = """
+        {
+            "type": "click",
+            "coordinates": ["100", "200"]
+        }
+        """
+    
+    let keyboardJSON = """
+        {
+            "type": "keydown",
+            "key": "Enter"
+        }
+        """
+    
+    let decoder = JSONDecoder()
+    
+    // Decode ClickEvent via discriminator
+    let clickData = clickJSON.data(using: .utf8)!
+    let clickUIEvent = try decoder.decode(BasicUIEvent.self, from: clickData)
+    
+    switch clickUIEvent {
+    case .ClickEvent(let event):
+        #expect(event.type.rawValue == "click")
+        #expect(event.coordinates == ["100", "200"])
+    case .KeyboardEvent:
+        #expect(Bool(false), "Should decode as ClickEvent based on discriminator")
+    }
+    
+    // Decode KeyboardEvent via discriminator
+    let keyboardData = keyboardJSON.data(using: .utf8)!
+    let keyboardUIEvent = try decoder.decode(BasicUIEvent.self, from: keyboardData)
+    
+    switch keyboardUIEvent {
+    case .KeyboardEvent(let event):
+        #expect(event.type.rawValue == "keydown")
+        #expect(event.key == "Enter")
+    case .ClickEvent:
+        #expect(Bool(false), "Should decode as KeyboardEvent based on discriminator")
+    }
+}
+
+@Test func testDifferentDiscriminatorFields() async throws {
+    // Test that different discriminator fields work correctly
+    let mediaJSON = """
+        {
+            "type": "video",
+            "url": "https://example.com/video.mp4",
+            "metadata": {"duration": "120"}
+        }
+        """
+    
+    let textJSON = """
+        {
+            "format": "markdown",
+            "content": "Hello",
+            "length": 5
+        }
+        """
+    
+    let decoder = JSONDecoder()
+    
+    // MediaEvent uses "type" as discriminator
+    let mediaData = mediaJSON.data(using: .utf8)!
+    let mediaContent = try decoder.decode(ContentEvent.self, from: mediaData)
+    
+    switch mediaContent {
+    case .MediaEvent(let event):
+        #expect(event.type.rawValue == "video")
+    case .TextEvent:
+        #expect(Bool(false), "Should decode as MediaEvent")
+    }
+    
+    // TextEvent uses "format" as discriminator
+    let textData = textJSON.data(using: .utf8)!
+    let textContent = try decoder.decode(ContentEvent.self, from: textData)
+    
+    switch textContent {
+    case .TextEvent(let event):
+        #expect(event.format.rawValue == "markdown")
+    case .MediaEvent:
+        #expect(Bool(false), "Should decode as TextEvent")
+    }
+}
+
+@Test func testTypeDiscriminatedProtocol() async throws {
+    // Verify that TypeDiscriminator macro generates correct protocol conformance
+    #expect(ClickEvent.discriminatorKey == "type")
+    #expect(ClickEvent.discriminatorValues == ["click"])
+    
+    #expect(KeyboardEvent.discriminatorKey == "type")
+    #expect(KeyboardEvent.discriminatorValues.contains("keydown"))
+    #expect(KeyboardEvent.discriminatorValues.contains("keyup"))
+    #expect(KeyboardEvent.discriminatorValues.count == 2)
+    
+    #expect(MediaEvent.discriminatorKey == "type")
+    #expect(MediaEvent.discriminatorValues == ["image", "video", "audio", "document"])
+    
+    #expect(TextEvent.discriminatorKey == "format")
+    #expect(TextEvent.discriminatorValues == ["plain", "markdown", "html"])
+}
+
+// MARK: - Non-Discriminated Union Tests (Backward Compatibility)
+
+struct SimpleA: Codable {
+    let value: String
+}
+
+struct SimpleB: Codable {
+    let value: String
+    let extra: Int
+}
+
+@Union(SimpleA.self, SimpleB.self) enum SimpleUnion {}
+
+@Test func testNonDiscriminatedUnionFallback() async throws {
+    // Test that unions without discriminators still work (backward compatibility)
+    // Note: Without discriminators, the first matching type will be selected.
+    // This is a limitation of non-discriminated unions.
+    let simpleAJSON = """
+        {
+            "value": "test"
+        }
+        """
+    
+    let decoder = JSONDecoder()
+    
+    // Should decode as SimpleA (first match)
+    let dataA = simpleAJSON.data(using: .utf8)!
+    let unionA = try decoder.decode(SimpleUnion.self, from: dataA)
+    
+    switch unionA {
+    case .SimpleA(let event):
+        #expect(event.value == "test")
+    case .SimpleB:
+        #expect(Bool(false), "Should decode as SimpleA")
+    }
+    
+    // Note: SimpleB with extra fields will still decode as SimpleA because
+    // Codable ignores extra fields by default. This is why discriminators are recommended.
+    // Test that it at least decodes successfully (even if as SimpleA)
+    let simpleBJSON = """
+        {
+            "value": "test",
+            "extra": 42
+        }
+        """
+    
+    let dataB = simpleBJSON.data(using: .utf8)!
+    let unionB = try decoder.decode(SimpleUnion.self, from: dataB)
+    
+    // Will decode as SimpleA due to first-match behavior
+    switch unionB {
+    case .SimpleA(let event):
+        #expect(event.value == "test")
+    case .SimpleB:
+        // SimpleB would only be selected if SimpleA failed to decode
+        #expect(Bool(false), "Decoded as SimpleB (unexpected but valid)")
     }
 }

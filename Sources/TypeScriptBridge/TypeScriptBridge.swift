@@ -51,14 +51,16 @@ import Foundation
 @attached(member, names: arbitrary)
 @attached(
     extension,
-    conformances: Codable, Equatable,
+    conformances: Codable,
+    Equatable,
     names: named(rawValue),
     named(init),
     named(init(rawValue:)),
     named(init(from:)),
     named(encode(to:))
 )
-public macro Union(_ literals: any _LiteralType...) = #externalMacro(module: "TypeScriptBridgeMacros", type: "LiteralUnionMacro")
+public macro Union(_ literals: any _LiteralType...) =
+    #externalMacro(module: "TypeScriptBridgeMacros", type: "LiteralUnionMacro")
 
 /// A macro that creates a union type from Swift types, similar to TypeScript's union types.
 ///
@@ -89,8 +91,42 @@ public macro Union(_ literals: any _LiteralType...) = #externalMacro(module: "Ty
 /// let entity: Entity = try JSONDecoder().decode(Entity.self, from: jsonData)
 /// ```
 @attached(member, names: arbitrary)
-@attached(extension, conformances: Codable, names: named(init(from:)), named(encode(to:)))
+@attached(extension, conformances: Codable, names: named(init(from:)), named(encode(to:)), named(AnyCodingKey))
 public macro Union(_ types: Any.Type...) = #externalMacro(module: "TypeScriptBridgeMacros", type: "TypeUnionMacro")
+
+/// A macro that marks a type as discriminated for use in type unions.
+///
+/// This macro analyzes the specified field to extract discriminator information
+/// and automatically implements the `TypeDiscriminated` protocol.
+///
+/// - Parameter field: The name of the discriminator field (e.g., "type")
+///
+/// ## Usage
+/// ```swift
+/// @TypeDiscriminator(field: "type")
+/// struct ClickEvent: Codable {
+///     @Union("click") enum EventType {}
+///     let type: EventType
+///     var coordinates: [String]
+/// }
+///
+/// @Union(ClickEvent.self, KeyboardEvent.self)
+/// enum UIEvent {}
+/// ```
+@attached(extension, conformances: TypeDiscriminated, names: named(discriminatorKey), named(discriminatorValues))
+public macro TypeDiscriminator(field: String) =
+    #externalMacro(module: "TypeScriptBridgeMacros", type: "TypeDiscriminatorMacro")
+
+/// Protocol for types that can be discriminated in a union by a specific field value.
+///
+/// Types conforming to this protocol provide information about which field
+/// and which values identify them in a discriminated union.
+public protocol TypeDiscriminated {
+    /// The name of the field used for discrimination (e.g., "type")
+    static var discriminatorKey: String { get }
+    /// The possible values of the discriminator field for this type (e.g., ["click"])
+    static var discriminatorValues: [String] { get }
+}
 
 public protocol _LiteralType: Codable, Equatable {}
 extension String: _LiteralType {}

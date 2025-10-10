@@ -69,8 +69,10 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
 
         let initFromDecoderMethod = try createInitFromDecoder(cases: typeInfos, accessModifier: accessModifier)
         let encodeToEncoderMethod = try createEncodeToEncoder(cases: typeInfos, accessModifier: accessModifier)
+        let anyCodingKeyDecl = createAnyCodingKey()
 
         let extensionDecl = try ExtensionDeclSyntax("extension \(type.trimmed): Codable") {
+            anyCodingKeyDecl
             initFromDecoderMethod
             encodeToEncoderMethod
         }
@@ -111,20 +113,41 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
         return try InitializerDeclSyntax(
             "\(raw: accessPrefix)init(from decoder: Decoder) throws"
         ) {
-            "let container = try decoder.singleValueContainer()"
-            ""
             // Generate type aliases to avoid name conflicts
             for (index, typeInfo) in cases.enumerated() {
                 "typealias Type\(raw: String(index)) = \(raw: typeInfo.typeName)"
             }
             ""
+            "// Try discriminated union decoding first"
+            "do {"
+            "    let container = try decoder.container(keyedBy: AnyCodingKey.self)"
+            "    "
+            "    // Check each discriminated type"
             for (index, typeInfo) in cases.enumerated() {
-                "if let event = try? container.decode(Type\(raw: String(index)).self) {"
-                "    self = .\(raw: typeInfo.caseName)(event)"
+                "    if let discriminated = Type\(raw: String(index)).self as? any TypeDiscriminated.Type {"
+                "        if let key = AnyCodingKey(stringValue: discriminated.discriminatorKey),"
+                "           let value = try? container.decode(String.self, forKey: key),"
+                "           discriminated.discriminatorValues.contains(value) {"
+                "            let decoded = try Type\(raw: String(index))(from: decoder)"
+                "            self = .\(raw: typeInfo.caseName)(decoded)"
+                "            return"
+                "        }"
+                "    }"
+            }
+            "} catch {"
+            "    // Fall through to non-discriminated decoding"
+            "}"
+            ""
+            "// Fall back to trying each type in order"
+            "let container = try decoder.singleValueContainer()"
+            for (index, typeInfo) in cases.enumerated() {
+                "if let value = try? container.decode(Type\(raw: String(index)).self) {"
+                "    self = .\(raw: typeInfo.caseName)(value)"
                 "    return"
                 "}"
             }
-            "throw DecodingError.dataCorruptedError(in: container, debugDescription: \"Invalid event type\")"
+            ""
+            "throw DecodingError.dataCorruptedError(in: container, debugDescription: \"Could not decode union type from any of the possible cases\")"
         }
     }
 
@@ -143,6 +166,25 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
             }
             "}"
         }
+    }
+
+    private static func createAnyCodingKey() -> DeclSyntax {
+        """
+        private struct AnyCodingKey: CodingKey {
+            var stringValue: String
+            var intValue: Int?
+            
+            init?(stringValue: String) {
+                self.stringValue = stringValue
+                self.intValue = nil
+            }
+            
+            init?(intValue: Int) {
+                self.stringValue = "\\(intValue)"
+                self.intValue = intValue
+            }
+        }
+        """
     }
 
 }
