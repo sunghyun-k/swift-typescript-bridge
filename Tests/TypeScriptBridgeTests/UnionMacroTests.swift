@@ -513,6 +513,71 @@ struct TextEvent: Codable {
     #expect(TextEvent.discriminatorValues == ["plain", "markdown", "html"])
 }
 
+@Test func testDiscriminatorMatchButInvalidFields() async throws {
+    // Test that when discriminator matches but other fields are invalid types,
+    // decoding fails with a proper error (not silently succeeding)
+    
+    // ClickEvent expects coordinates as [String], but we provide a number
+    let invalidClickJSON = """
+        {
+            "type": "click",
+            "coordinates": 123
+        }
+        """
+    
+    let decoder = JSONDecoder()
+    let invalidClickData = invalidClickJSON.data(using: .utf8)!
+    
+    // Should throw an error, not succeed
+    do {
+        _ = try decoder.decode(BasicUIEvent.self, from: invalidClickData)
+        #expect(Bool(false), "Should have thrown an error for invalid field type")
+    } catch {
+        // Expected - should fail to decode
+        #expect(error is DecodingError, "Should be a DecodingError")
+    }
+    
+    // KeyboardEvent expects KeyboardEvent fields, but we provide ClickEvent fields
+    let invalidKeyboardJSON = """
+        {
+            "type": "keydown",
+            "coordinates": ["100", "200"]
+        }
+        """
+    
+    let invalidKeyboardData = invalidKeyboardJSON.data(using: .utf8)!
+    
+    do {
+        _ = try decoder.decode(BasicUIEvent.self, from: invalidKeyboardData)
+        #expect(Bool(false), "Should have thrown an error for invalid field type")
+    } catch {
+        // Expected - should fail to decode
+        #expect(error is DecodingError, "Should be a DecodingError")
+    }
+}
+
+@Test func testDiscriminatorMatchButMissingRequiredFields() async throws {
+    // Test that when discriminator matches but required fields are missing,
+    // decoding fails properly
+    
+    let missingFieldsJSON = """
+        {
+            "type": "click"
+        }
+        """
+    
+    let decoder = JSONDecoder()
+    let data = missingFieldsJSON.data(using: .utf8)!
+    
+    do {
+        _ = try decoder.decode(BasicUIEvent.self, from: data)
+        #expect(Bool(false), "Should have thrown an error for missing required field")
+    } catch {
+        // Expected - coordinates field is missing
+        #expect(error is DecodingError, "Should be a DecodingError")
+    }
+}
+
 // MARK: - Non-Discriminated Union Tests (Backward Compatibility)
 
 struct SimpleA: Codable {
