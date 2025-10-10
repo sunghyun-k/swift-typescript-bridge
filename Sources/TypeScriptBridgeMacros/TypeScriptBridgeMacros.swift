@@ -8,6 +8,6 @@ struct TypeScriptBridgePlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
         LiteralUnionMacro.self,
         TypeUnionMacro.self,
-        TypeDiscriminatorMacro.self,
+        UnionDiscriminatorMacro.self,
     ]
 }

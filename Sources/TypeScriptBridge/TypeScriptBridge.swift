@@ -96,14 +96,14 @@ public macro Union(_ types: Any.Type...) = #externalMacro(module: "TypeScriptBri
 
 /// A macro that marks a type as discriminated for use in type unions.
 ///
-/// This macro analyzes the specified field to extract discriminator information
+/// This macro analyzes the specified property to extract discriminator information
 /// and automatically implements the `TypeDiscriminated` protocol.
 ///
-/// - Parameter field: The name of the discriminator field (e.g., "type")
+/// - Parameter _: The name of the discriminator property (e.g., "type")
 ///
 /// ## Usage
 /// ```swift
-/// @TypeDiscriminator(field: "type")
+/// @UnionDiscriminator("type")
 /// struct ClickEvent: Codable {
 ///     @Union("click") enum EventType {}
 ///     let type: EventType
@@ -114,8 +114,8 @@ public macro Union(_ types: Any.Type...) = #externalMacro(module: "TypeScriptBri
 /// enum UIEvent {}
 /// ```
 @attached(extension, conformances: TypeDiscriminated, names: named(discriminatorKey), named(discriminatorValues))
-public macro TypeDiscriminator(field: String) =
-    #externalMacro(module: "TypeScriptBridgeMacros", type: "TypeDiscriminatorMacro")
+public macro UnionDiscriminator(_ property: String) =
+    #externalMacro(module: "TypeScriptBridgeMacros", type: "UnionDiscriminatorMacro")
 
 /// Protocol for types that can be discriminated in a union by a specific field value.
 ///

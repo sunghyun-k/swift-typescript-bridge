@@ -5,11 +5,11 @@ import SwiftSyntaxMacros
 /// A macro implementation that marks types as discriminated for use in unions.
 ///
 /// This macro:
-/// - Extracts the discriminator field name from the keyPath
-/// - Finds the field's type definition (must be an enum with @Union)
+/// - Extracts the discriminator property name from the parameter
+/// - Finds the property's type definition (must be an enum with @Union)
 /// - Extracts the literal values from the @Union macro
 /// - Generates TypeDiscriminated protocol conformance
-public struct TypeDiscriminatorMacro: ExtensionMacro {
+public struct UnionDiscriminatorMacro: ExtensionMacro {
     public static func expansion(
         of node: AttributeSyntax,
         attachedTo declaration: some DeclGroupSyntax,
@@ -19,20 +19,20 @@ public struct TypeDiscriminatorMacro: ExtensionMacro {
     ) throws -> [ExtensionDeclSyntax] {
 
         guard let structDecl = declaration.as(StructDeclSyntax.self) else {
-            throw TypeDiscriminatorError.notAStruct
+            throw UnionDiscriminatorError.notAStruct
         }
 
-        // Extract keyPath argument
-        let keyFieldName = try extractKeyFieldName(from: node)
+        // Extract property name argument
+        let keyFieldName = try extractPropertyName(from: node)
 
         // Find the field in the struct
         guard let fieldType = findFieldType(named: keyFieldName, in: structDecl) else {
-            throw TypeDiscriminatorError.fieldNotFound(keyFieldName)
+            throw UnionDiscriminatorError.fieldNotFound(keyFieldName)
         }
 
         // Find the enum declaration for this field type
         guard let enumDecl = findEnumDeclaration(named: fieldType, in: structDecl) else {
-            throw TypeDiscriminatorError.enumNotFound(fieldType)
+            throw UnionDiscriminatorError.enumNotFound(fieldType)
         }
 
         // Extract discriminator values from @Union attribute
@@ -49,13 +49,17 @@ public struct TypeDiscriminatorMacro: ExtensionMacro {
         return [extensionDecl]
     }
 
-    /// Extracts the field name from the field argument
-    private static func extractKeyFieldName(from node: AttributeSyntax) throws -> String {
+    /// Extracts the property name from the unlabeled argument
+    private static func extractPropertyName(from node: AttributeSyntax) throws -> String {
         guard let arguments = node.arguments?.as(LabeledExprListSyntax.self),
-            let firstArg = arguments.first,
-            firstArg.label?.text == "field"
+            let firstArg = arguments.first
         else {
-            throw TypeDiscriminatorError.missingField
+            throw UnionDiscriminatorError.missingProperty
+        }
+
+        // Check that the argument is unlabeled (label is nil or empty)
+        if let label = firstArg.label, !label.text.isEmpty {
+            throw UnionDiscriminatorError.unexpectedLabel
         }
 
         // Handle string literal
@@ -67,7 +71,7 @@ public struct TypeDiscriminatorMacro: ExtensionMacro {
             }
         }
 
-        throw TypeDiscriminatorError.invalidField
+        throw UnionDiscriminatorError.invalidProperty
     }
 
     /// Finds the type of a field in the struct
@@ -114,7 +118,7 @@ public struct TypeDiscriminatorMacro: ExtensionMacro {
 
                 // Extract literal arguments
                 guard let arguments = customAttr.arguments?.as(LabeledExprListSyntax.self) else {
-                    throw TypeDiscriminatorError.noUnionArguments
+                    throw UnionDiscriminatorError.noUnionArguments
                 }
 
                 var values: [String] = []
@@ -137,22 +141,23 @@ public struct TypeDiscriminatorMacro: ExtensionMacro {
                 }
 
                 if values.isEmpty {
-                    throw TypeDiscriminatorError.noValidUnionValues
+                    throw UnionDiscriminatorError.noValidUnionValues
                 }
 
                 return values
             }
         }
 
-        throw TypeDiscriminatorError.missingUnionAttribute
+        throw UnionDiscriminatorError.missingUnionAttribute
     }
 }
 
-/// Errors that can occur during type discriminator macro expansion.
-enum TypeDiscriminatorError: Error, CustomStringConvertible {
+/// Errors that can occur during union discriminator macro expansion.
+enum UnionDiscriminatorError: Error, CustomStringConvertible {
     case notAStruct
-    case missingField
-    case invalidField
+    case missingProperty
+    case invalidProperty
+    case unexpectedLabel
     case fieldNotFound(String)
     case enumNotFound(String)
     case missingUnionAttribute
@@ -162,17 +167,20 @@ enum TypeDiscriminatorError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .notAStruct:
-            return "@TypeDiscriminator can only be applied to struct declarations"
-        case .missingField:
-            return "@TypeDiscriminator requires a field argument"
-        case .invalidField:
-            return "Invalid field format. Expected a string literal (e.g., \"type\")"
+            return "@UnionDiscriminator can only be applied to struct declarations"
+        case .missingProperty:
+            return "@UnionDiscriminator requires a property name argument"
+        case .invalidProperty:
+            return "Invalid property format. Expected a string literal (e.g., \"type\")"
+        case .unexpectedLabel:
+            return
+                "@UnionDiscriminator expects an unlabeled argument. Use @UnionDiscriminator(\"type\") not @UnionDiscriminator(property: \"type\")"
         case .fieldNotFound(let name):
-            return "Field '\(name)' not found in struct"
+            return "Property '\(name)' not found in struct"
         case .enumNotFound(let name):
             return "Enum type '\(name)' not found in struct"
         case .missingUnionAttribute:
-            return "The discriminator field's enum must have a @Union attribute"
+            return "The discriminator property's enum must have a @Union attribute"
         case .noUnionArguments:
             return "@Union attribute must have literal arguments"
         case .noValidUnionValues:

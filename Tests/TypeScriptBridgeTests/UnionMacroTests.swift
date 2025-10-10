@@ -4,14 +4,14 @@ import Foundation
 
 // MARK: - Basic Test Types
 
-@TypeDiscriminator(field: "type")
+@UnionDiscriminator("type")
 struct ClickEvent: Codable {
     @Union("click") enum EventType {}
     let type: EventType
     var coordinates: [String]
 }
 
-@TypeDiscriminator(field: "type")
+@UnionDiscriminator("type")
 struct KeyboardEvent: Codable {
     @Union("keydown", "keyup") enum EventType {}
     let type: EventType
@@ -339,7 +339,7 @@ struct MixedTypeConfig: Codable {
 
 // MARK: - Enum with Associated Values in Union
 
-@TypeDiscriminator(field: "type")
+@UnionDiscriminator("type")
 struct MediaEvent: Codable {
     @Union("image", "video", "audio", "document") enum MediaType {}
     let type: MediaType
@@ -347,7 +347,7 @@ struct MediaEvent: Codable {
     let metadata: [String: String]?
 }
 
-@TypeDiscriminator(field: "format")
+@UnionDiscriminator("format")
 struct TextEvent: Codable {
     @Union("plain", "markdown", "html") enum Format {}
     let format: Format
