@@ -4,12 +4,14 @@ import Foundation
 
 // MARK: - Validation Test Types
 
+@UnionDiscriminator("type")
 struct ValidatedClickEvent: Codable {
     @Union("click") enum EventType {}
     let type: EventType
     var coordinates: [String]
 }
 
+@UnionDiscriminator("type")
 struct ValidatedKeyboardEvent: Codable {
     @Union("keydown", "keyup") enum EventType {}
     let type: EventType
@@ -34,16 +36,8 @@ struct StrictEvent: Codable {
         }
         """
 
-    let data = invalidJSON.data(using: .utf8)!
-    let decoder = JSONDecoder()
-
     // 잘못된 type 값은 디코딩 실패해야 함
-    do {
-        let _ = try decoder.decode(ValidatedClickEvent.self, from: data)
-        #expect(Bool(false), "Should have failed to decode invalid type")
-    } catch {
-        #expect(error is DecodingError, "Expected DecodingError for invalid type")
-    }
+    try await expectDecodingFailure(ValidatedClickEvent.self, from: invalidJSON)
 }
 
 @Test func testValidLiteralUnionValueAcceptance() async throws {
@@ -54,11 +48,8 @@ struct StrictEvent: Codable {
         }
         """
 
-    let data = validJSON.data(using: .utf8)!
-    let decoder = JSONDecoder()
-
     // 올바른 type 값은 성공해야 함
-    let clickEvent = try decoder.decode(ValidatedClickEvent.self, from: data)
+    let clickEvent = try decodeFromJSON(ValidatedClickEvent.self, from: validJSON)
     #expect(clickEvent.type.rawValue == "click")
     #expect(clickEvent.coordinates == ["100", "200"])
 }
@@ -73,7 +64,7 @@ struct StrictEvent: Codable {
 
     let validKeyupJSON = """
         {
-            "type": "keyup", 
+            "type": "keyup",
             "key": "Escape"
         }
         """
@@ -85,28 +76,18 @@ struct StrictEvent: Codable {
         }
         """
 
-    let decoder = JSONDecoder()
-
     // 유효한 keydown
-    let keydownData = validKeydownJSON.data(using: .utf8)!
-    let keydownEvent = try decoder.decode(ValidatedKeyboardEvent.self, from: keydownData)
+    let keydownEvent = try decodeFromJSON(ValidatedKeyboardEvent.self, from: validKeydownJSON)
     #expect(keydownEvent.type.rawValue == "keydown")
     #expect(keydownEvent.key == "Enter")
 
     // 유효한 keyup
-    let keyupData = validKeyupJSON.data(using: .utf8)!
-    let keyupEvent = try decoder.decode(ValidatedKeyboardEvent.self, from: keyupData)
+    let keyupEvent = try decodeFromJSON(ValidatedKeyboardEvent.self, from: validKeyupJSON)
     #expect(keyupEvent.type.rawValue == "keyup")
     #expect(keyupEvent.key == "Escape")
 
     // 무효한 type
-    let invalidData = invalidJSON.data(using: .utf8)!
-    do {
-        let _ = try decoder.decode(ValidatedKeyboardEvent.self, from: invalidData)
-        #expect(Bool(false), "Should have failed to decode invalid keyboard type")
-    } catch {
-        #expect(error is DecodingError, "Expected DecodingError for invalid keyboard type")
-    }
+    try await expectDecodingFailure(ValidatedKeyboardEvent.self, from: invalidJSON)
 }
 
 @Test func testTypeUnionValidation() async throws {
@@ -141,49 +122,33 @@ struct StrictEvent: Codable {
         }
         """
 
-    let decoder = JSONDecoder()
-
     // 유효한 클릭 이벤트 테스트
-    let clickData = validClickJSON.data(using: .utf8)!
-    let clickUIEvent = try decoder.decode(ValidatedUIEvent.self, from: clickData)
+    let clickUIEvent = try decodeFromJSON(ValidatedUIEvent.self, from: validClickJSON)
 
     switch clickUIEvent {
     case .ValidatedClickEvent(let event):
         #expect(event.type.rawValue == "click")
         #expect(event.coordinates == ["50", "75"])
     case .ValidatedKeyboardEvent:
-        #expect(Bool(false), "Expected ValidatedClickEvent")
+        Issue.record("Expected ValidatedClickEvent, got ValidatedKeyboardEvent")
     }
 
     // 유효한 키보드 이벤트 테스트
-    let keyboardData = validKeyboardJSON.data(using: .utf8)!
-    let keyboardUIEvent = try decoder.decode(ValidatedUIEvent.self, from: keyboardData)
+    let keyboardUIEvent = try decodeFromJSON(ValidatedUIEvent.self, from: validKeyboardJSON)
 
     switch keyboardUIEvent {
     case .ValidatedKeyboardEvent(let event):
         #expect(event.type.rawValue == "keydown")
         #expect(event.key == "Space")
     case .ValidatedClickEvent:
-        #expect(Bool(false), "Expected ValidatedKeyboardEvent")
+        Issue.record("Expected ValidatedKeyboardEvent, got ValidatedClickEvent")
     }
 
     // 잘못된 타입 값 테스트
-    let invalidTypeData = invalidTypeJSON.data(using: .utf8)!
-    do {
-        let _ = try decoder.decode(ValidatedUIEvent.self, from: invalidTypeData)
-        #expect(Bool(false), "Should have failed to decode event with invalid type")
-    } catch {
-        #expect(error is DecodingError, "Expected DecodingError for invalid type")
-    }
+    try await expectDecodingFailure(ValidatedUIEvent.self, from: invalidTypeJSON)
 
     // 잘못된 구조 테스트
-    let invalidStructureData = invalidStructureJSON.data(using: .utf8)!
-    do {
-        let _ = try decoder.decode(ValidatedUIEvent.self, from: invalidStructureData)
-        #expect(Bool(false), "Should have failed to decode event with invalid structure")
-    } catch {
-        #expect(error is DecodingError, "Expected DecodingError for invalid structure")
-    }
+    try await expectDecodingFailure(ValidatedUIEvent.self, from: invalidStructureJSON)
 }
 
 @Test func testStrictValidationWithMultipleLiterals() async throws {
@@ -198,8 +163,6 @@ struct StrictEvent: Codable {
         ("allowed ", false),  // 공백 포함
     ]
 
-    let decoder = JSONDecoder()
-
     for (status, shouldSucceed) in testCases {
         let json = """
             {
@@ -208,19 +171,12 @@ struct StrictEvent: Codable {
             }
             """
 
-        let data = json.data(using: .utf8)!
-
         if shouldSucceed {
-            let event = try decoder.decode(StrictEvent.self, from: data)
+            let event = try decodeFromJSON(StrictEvent.self, from: json)
             #expect(event.status.rawValue == status)
             #expect(event.message == "Test message")
         } else {
-            do {
-                let _ = try decoder.decode(StrictEvent.self, from: data)
-                #expect(Bool(false), "Should have failed to decode status: '\(status)'")
-            } catch {
-                #expect(error is DecodingError, "Expected DecodingError for status: '\(status)'")
-            }
+            try await expectDecodingFailure(StrictEvent.self, from: json)
         }
     }
 }
@@ -241,19 +197,10 @@ struct StrictEvent: Codable {
         }
         """
 
-    let decoder = JSONDecoder()
-
     // 올바른 대소문자
-    let correctData = correctCaseJSON.data(using: .utf8)!
-    let correctEvent = try decoder.decode(StrictEvent.self, from: correctData)
+    let correctEvent = try decodeFromJSON(StrictEvent.self, from: correctCaseJSON)
     #expect(correctEvent.status.rawValue == "allowed")
 
     // 잘못된 대소문자
-    let incorrectData = incorrectCaseJSON.data(using: .utf8)!
-    do {
-        let _ = try decoder.decode(StrictEvent.self, from: incorrectData)
-        #expect(Bool(false), "Should have failed with incorrect case")
-    } catch {
-        #expect(error is DecodingError, "Expected DecodingError for incorrect case")
-    }
+    try await expectDecodingFailure(StrictEvent.self, from: incorrectCaseJSON)
 }
