@@ -14,6 +14,7 @@ A Swift macro library that brings TypeScript-style union types to Swift, providi
 - 📦 **Automatic Codable**: Built-in JSON serialization/deserialization support
 - 🔢 **Multiple Literal Types**: Support for String, Int, Double, and Bool literals
 - 🎯 **Mixed Type Unions**: Combine different literal types (strings, numbers, booleans) in a single union
+- 🏷️ **Discriminated Unions**: Efficient type discrimination using discriminator properties for accurate decoding
 - 🌐 **Unicode Support**: Works with any characters including emojis and Swift keywords
 - ⚡ **Zero Runtime Cost**: Fully resolved at compile time using Swift macros
 
@@ -90,6 +91,41 @@ let user = User(name: "Alice", email: "alice@example.com")
 let entity = Entity.User(user)
 ```
 
+### Discriminated Unions
+
+Use `@UnionDiscriminator` to mark discriminator properties for efficient and accurate type discrimination:
+
+```swift
+// TypeScript-style discriminated union
+@UnionDiscriminator("type")
+struct ClickEvent: Codable {
+    @Union("click") enum EventType {}
+    let type: EventType
+    var coordinates: [String]
+}
+
+@UnionDiscriminator("type")
+struct KeyboardEvent: Codable {
+    @Union("keydown", "keyup") enum EventType {}
+    let type: EventType
+    var key: String
+}
+
+@Union(ClickEvent.self, KeyboardEvent.self) 
+enum UIEvent {}
+
+// JSON with discriminator field "type"
+let json = """
+{
+    "type": "click",
+    "coordinates": ["100", "200"]
+}
+"""
+
+let event = try JSONDecoder().decode(UIEvent.self, from: json.data(using: .utf8)!)
+// ✅ Efficiently decoded as ClickEvent using discriminator
+```
+
 ## Advanced Usage
 
 ### Web Analytics Events
@@ -118,7 +154,8 @@ type WebEvent = PageViewEvent | UserActionEvent | ConversionEvent;
 ```
 
 ```swift
-// Swift TypeScript Bridge - Parse analytics from web frontend
+// Swift TypeScript Bridge - Parse analytics from web frontend with discriminated unions
+@UnionDiscriminator("event")
 struct PageViewEvent: Codable {
     @Union("page_view") enum EventType {}
     let event: EventType
@@ -126,6 +163,7 @@ struct PageViewEvent: Codable {
     let referrer: String?
 }
 
+@UnionDiscriminator("event")
 struct UserActionEvent: Codable {
     @Union("click", "hover", "focus", "scroll") enum EventType {}
     let event: EventType
@@ -133,6 +171,7 @@ struct UserActionEvent: Codable {
     let timestamp: Double
 }
 
+@UnionDiscriminator("event")
 struct ConversionEvent: Codable {
     @Union("purchase", "signup", "download") enum EventType {}
     let event: EventType
@@ -152,6 +191,7 @@ let analyticsJson = """
 }
 """
 
+// Efficiently decoded using "event" discriminator
 let userAction = try JSONDecoder().decode(WebEvent.self, from: analyticsJson.data(using: .utf8)!)
 ```
 
@@ -180,6 +220,7 @@ type ApiResponse = SuccessResponse | ErrorResponse;
 
 ```swift
 // Swift TypeScript Bridge - Parse discriminated API responses
+@UnionDiscriminator("status")
 struct SuccessResponse: Codable {
     @Union("success") enum Status {}
     let status: Status
@@ -190,6 +231,7 @@ struct SuccessResponse: Codable {
     let data: SuccessData
 }
 
+@UnionDiscriminator("status")
 struct ErrorResponse: Codable {
     @Union("error") enum Status {}
     let status: Status
@@ -223,8 +265,15 @@ let errorJson = """
 }
 """
 
-let successResponse = try JSONDecoder().decode(SuccessResponse.self, from: successJson.data(using: .utf8)!)
-let errorResponse = try JSONDecoder().decode(ErrorResponse.self, from: errorJson.data(using: .utf8)!)
+// Efficiently decoded using "status" discriminator - immediately identifies the correct type
+let apiResponse = try JSONDecoder().decode(ApiResponse.self, from: successJson.data(using: .utf8)!)
+
+switch apiResponse {
+case .SuccessResponse(let response):
+    print("Success: \(response.data.name)")
+case .ErrorResponse(let response):
+    print("Error: \(response.error.message)")
+}
 ```
 
 ## Requirements
@@ -235,10 +284,30 @@ let errorResponse = try JSONDecoder().decode(ErrorResponse.self, from: errorJson
 
 Swift TypeScript Bridge uses Swift macros to generate code at compile time:
 
-1. **Literal Unions**: Creates enum cases with backticks for special characters
-2. **Type Unions**: Creates enum cases with associated values for each type  
-3. **Codable Support**: Generates custom `init(from:)` and `encode(to:)` implementations
-4. **Access Control**: Applies the same access modifier to all generated code
+1. **Literal Unions** (`@Union`): Creates enum cases with backticks for special characters and implements `Codable` conformance
+2. **Type Unions** (`@Union`): Creates enum cases with associated values for each type  
+3. **Discriminated Unions** (`@UnionDiscriminator`): Marks discriminator properties for efficient type discrimination
+   - Automatically extracts discriminator values from `@Union` attributes
+   - Generates optimized decoding that checks discriminator first
+   - Falls back to trying each type sequentially for non-discriminated types
+4. **Codable Support**: Generates custom `init(from:)` and `encode(to:)` implementations
+5. **Access Control**: Applies the same access modifier to all generated code
+
+### Discriminated Union Decoding Strategy
+
+When decoding a union type:
+
+1. **Discriminated Types** (marked with `@UnionDiscriminator`):
+   - Reads the discriminator field from JSON
+   - Matches the value against discriminator values
+   - Decodes directly as the matched type
+   - ✅ **Fast and accurate** - no trial-and-error
+   - ✅ **Clear error messages** - if fields don't match, shows exactly what went wrong
+
+2. **Non-Discriminated Types** (backward compatibility):
+   - Tries to decode as each type in order
+   - Uses first successful match
+   - ⚠️ May select wrong type if structures are similar
 
 The generated code is fully visible in Xcode's macro expansion view, making debugging straightforward.
 
