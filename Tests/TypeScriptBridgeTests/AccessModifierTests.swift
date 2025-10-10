@@ -69,7 +69,7 @@ struct InternalMessage: Codable {
         #expect(decodedUser.name == "Alice")
         #expect(decodedUser.age == 30)
     case .PublicMessage:
-        #expect(Bool(false), "Expected PublicUser")
+        Issue.record("Expected PublicUser")
     }
 }
 
@@ -100,7 +100,7 @@ struct InternalMessage: Codable {
         #expect(decodedUser.name == "Bob")
         #expect(decodedUser.age == 25)
     case .InternalMessage:
-        #expect(Bool(false), "Expected InternalUser")
+        Issue.record("Expected InternalUser")
     }
 }
 
@@ -126,13 +126,13 @@ struct InternalMessage: Codable {
     case .PublicUser(let user):
         #expect(user.name == "Charlie")
     case .PublicMessage:
-        #expect(Bool(false), "Expected PublicUser")
+        Issue.record("Expected PublicUser")
     }
 
     switch decodedInternal {
     case .InternalUser(let user):
         #expect(user.name == "David")
     case .InternalMessage:
-        #expect(Bool(false), "Expected InternalUser")
+        Issue.record("Expected InternalUser")
     }
 }

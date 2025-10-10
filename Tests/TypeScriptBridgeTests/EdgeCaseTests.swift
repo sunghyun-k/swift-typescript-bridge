@@ -82,7 +82,7 @@ enum DuplicateUnion {}
 
     for (literal, description) in testCases {
         guard let type = SpecialCharEvent.CharType(rawValue: literal) else {
-            #expect(Bool(false), "Failed to create type for \(description): \(literal)")
+            Issue.record("Failed to create type for \(description): \(literal)")
             continue
         }
 
@@ -103,7 +103,7 @@ enum DuplicateUnion {}
 
     for number in numbers {
         guard let type = NumericStringEvent.NumberType(rawValue: number) else {
-            #expect(Bool(false), "Failed to create type for numeric starting string: \(number)")
+            Issue.record("Failed to create type for numeric starting string: \(number)")
             continue
         }
 
@@ -124,7 +124,7 @@ enum DuplicateUnion {}
 
     for char in chars {
         guard let type = SingleCharEvent.CharType(rawValue: char) else {
-            #expect(Bool(false), "Failed to create type for character: \(char)")
+            Issue.record("Failed to create type for character: \(char)")
             continue
         }
 
@@ -152,7 +152,7 @@ enum DuplicateUnion {}
 
     for (literal, description) in testCases {
         guard let type = WhitespaceStartEvent.WhitespaceType(rawValue: literal) else {
-            #expect(Bool(false), "Failed to create type for \(description): '\(literal)'")
+            Issue.record("Failed to create type for \(description): '\(literal)'")
             continue
         }
 
@@ -173,7 +173,7 @@ enum DuplicateUnion {}
         "this_is_a_very_long_string_literal_that_might_cause_issues_in_some_systems_but_should_work_fine_here"
 
     guard let type = LongStringEvent.LengthType(rawValue: longString) else {
-        #expect(Bool(false), "Failed to create type for long string")
+        Issue.record("Failed to create type for long string")
         return
     }
 
@@ -208,7 +208,7 @@ enum DuplicateUnion {}
     case .DuplicateNameTest1(let event):
         #expect(event.status.rawValue == "test")
     case .DuplicateNameTest2:
-        #expect(Bool(false), "Expected DuplicateNameTest1")
+        Issue.record("Expected DuplicateNameTest1")
     }
 
     // Test second duplicate - this will also decode as first type due to identical structure
@@ -222,7 +222,7 @@ enum DuplicateUnion {}
     // This is expected behavior - macro uses first matching type
     case .DuplicateNameTest2:
         // This won't happen due to identical structure
-        #expect(Bool(false), "Unexpected: DuplicateNameTest2 was matched")
+        Issue.record("Unexpected: DuplicateNameTest2 was matched")
     }
 }
 
@@ -254,7 +254,7 @@ struct BacktickTestEvent: Codable {
 
     for (literal, description) in testCases {
         guard let type = BacktickTestEvent.AnyCharType(rawValue: literal) else {
-            #expect(Bool(false), "Failed to create type for \(description): '\(literal)'")
+            Issue.record("Failed to create type for \(description): '\(literal)'")
             continue
         }
 
@@ -352,7 +352,7 @@ enum LargeUnion {}
             #expect(orig.kind.rawValue == dec.kind.rawValue)
             #expect(abs(orig.timestamp.timeIntervalSince(dec.timestamp)) < 1.0)
         default:
-            #expect(Bool(false), "Type mismatch in large union test")
+            Issue.record("Type mismatch in large union test")
         }
     }
 }
@@ -405,7 +405,7 @@ enum LargeUnion {}
             // Date comparison is approximate
             break
         default:
-            #expect(Bool(false), "Type mismatch at index \(i)")
+            Issue.record("Type mismatch at index \(i)")
         }
     }
 }

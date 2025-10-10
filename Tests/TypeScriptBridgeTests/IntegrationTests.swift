@@ -64,7 +64,7 @@ struct DataEvent: Codable {
         #expect(event.type.rawValue == "login")
         #expect(event.userId == "user123")
     case .DataEvent:
-        #expect(Bool(false), "Expected AuthEvent")
+        Issue.record("Expected AuthEvent")
     }
 
     // Verify second event
@@ -74,7 +74,7 @@ struct DataEvent: Codable {
         #expect(event.entityId == "entity456")
         #expect(event.changes?["name"] == "New Name")
     case .AuthEvent:
-        #expect(Bool(false), "Expected DataEvent")
+        Issue.record("Expected DataEvent")
     }
 }
 

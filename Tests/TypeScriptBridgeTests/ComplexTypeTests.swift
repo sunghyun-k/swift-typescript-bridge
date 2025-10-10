@@ -195,7 +195,7 @@ struct InteractionEvent: Codable {
         #expect(message.senderId == "user456")
         #expect(message.channelId == "general")
     default:
-        #expect(Bool(false), "Expected ChatMessage payload")
+        Issue.record("Expected ChatMessage payload")
     }
 }
 
@@ -227,7 +227,7 @@ struct InteractionEvent: Codable {
         #expect(notif.title == "시스템 점검 안내")
         #expect(notif.actionRequired == true)
     default:
-        #expect(Bool(false), "Expected SystemNotification payload")
+        Issue.record("Expected SystemNotification payload")
     }
 }
 
@@ -254,7 +254,7 @@ struct InteractionEvent: Codable {
         #expect(event.recordId == "12345")
         #expect(event.affectedRows == 1)
     default:
-        #expect(Bool(false), "Expected DatabaseEvent")
+        Issue.record("Expected DatabaseEvent")
     }
 }
 
@@ -282,7 +282,7 @@ struct InteractionEvent: Codable {
         #expect(event.coordinates?[1] == 200.3)
         #expect(event.viewport?.width == 1920)
     default:
-        #expect(Bool(false), "Expected InteractionEvent")
+        Issue.record("Expected InteractionEvent")
     }
 }
 
@@ -317,6 +317,6 @@ struct InteractionEvent: Codable {
         #expect(error.stackTrace == nil)
         #expect(error.userAgent == "Mozilla/5.0...")
     default:
-        #expect(Bool(false), "Expected ErrorReport payload")
+        Issue.record("Expected ErrorReport payload")
     }
 }

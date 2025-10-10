@@ -67,7 +67,7 @@ struct TextEvent: Codable {
         #expect(event.type.rawValue == "click")
         #expect(event.coordinates == ["100", "200"])
     case .DiscKeyboardEvent:
-        #expect(Bool(false), "Should decode as ClickEvent based on discriminator")
+        Issue.record("Should decode as ClickEvent based on discriminator")
     }
 
     // Decode KeyboardEvent via discriminator
@@ -79,7 +79,7 @@ struct TextEvent: Codable {
         #expect(event.type.rawValue == "keydown")
         #expect(event.key == "Enter")
     case .DiscClickEvent:
-        #expect(Bool(false), "Should decode as KeyboardEvent based on discriminator")
+        Issue.record("Should decode as KeyboardEvent based on discriminator")
     }
 }
 
@@ -111,7 +111,7 @@ struct TextEvent: Codable {
     case .MediaEvent(let event):
         #expect(event.type.rawValue == "video")
     case .TextEvent:
-        #expect(Bool(false), "Should decode as MediaEvent")
+        Issue.record("Should decode as MediaEvent")
     }
 
     // TextEvent uses "format" as discriminator
@@ -122,7 +122,7 @@ struct TextEvent: Codable {
     case .TextEvent(let event):
         #expect(event.format.rawValue == "markdown")
     case .MediaEvent:
-        #expect(Bool(false), "Should decode as TextEvent")
+        Issue.record("Should decode as TextEvent")
     }
 }
 
@@ -163,7 +163,7 @@ struct TextEvent: Codable {
         #expect(event.metadata?["duration"] == "120")
         #expect(event.metadata?["quality"] == "1080p")
     case .TextEvent:
-        #expect(Bool(false), "Expected MediaEvent")
+        Issue.record("Expected MediaEvent")
     }
 }
 
@@ -188,7 +188,7 @@ struct TextEvent: Codable {
         #expect(event.content == "# 제목\n\n이것은 **마크다운** 텍스트입니다.")
         #expect(event.length == 25)
     case .MediaEvent:
-        #expect(Bool(false), "Expected TextEvent")
+        Issue.record("Expected TextEvent")
     }
 }
 
@@ -212,7 +212,7 @@ struct TextEvent: Codable {
     // Should throw an error, not succeed
     do {
         _ = try decoder.decode(DiscUIEvent.self, from: invalidClickData)
-        #expect(Bool(false), "Should have thrown an error for invalid field type")
+        Issue.record("Should have thrown an error for invalid field type")
     } catch {
         // Expected - should fail to decode
         #expect(error is DecodingError, "Should be a DecodingError")
@@ -230,7 +230,7 @@ struct TextEvent: Codable {
 
     do {
         _ = try decoder.decode(DiscUIEvent.self, from: invalidKeyboardData)
-        #expect(Bool(false), "Should have thrown an error for invalid field type")
+        Issue.record("Should have thrown an error for invalid field type")
     } catch {
         // Expected - should fail to decode
         #expect(error is DecodingError, "Should be a DecodingError")
@@ -252,7 +252,7 @@ struct TextEvent: Codable {
 
     do {
         _ = try decoder.decode(DiscUIEvent.self, from: data)
-        #expect(Bool(false), "Should have thrown an error for missing required field")
+        Issue.record("Should have thrown an error for missing required field")
     } catch {
         // Expected - coordinates field is missing
         #expect(error is DecodingError, "Should be a DecodingError")
