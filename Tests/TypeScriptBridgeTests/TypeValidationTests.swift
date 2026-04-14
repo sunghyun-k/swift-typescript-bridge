@@ -126,10 +126,10 @@ struct StrictEvent: Codable {
     let clickUIEvent = try decodeFromJSON(ValidatedUIEvent.self, from: validClickJSON)
 
     switch clickUIEvent {
-    case .ValidatedClickEvent(let event):
+    case .validatedClickEvent(let event):
         #expect(event.type.rawValue == "click")
         #expect(event.coordinates == ["50", "75"])
-    case .ValidatedKeyboardEvent:
+    case .validatedKeyboardEvent:
         Issue.record("Expected ValidatedClickEvent, got ValidatedKeyboardEvent")
     }
 
@@ -137,10 +137,10 @@ struct StrictEvent: Codable {
     let keyboardUIEvent = try decodeFromJSON(ValidatedUIEvent.self, from: validKeyboardJSON)
 
     switch keyboardUIEvent {
-    case .ValidatedKeyboardEvent(let event):
+    case .validatedKeyboardEvent(let event):
         #expect(event.type.rawValue == "keydown")
         #expect(event.key == "Space")
-    case .ValidatedClickEvent:
+    case .validatedClickEvent:
         Issue.record("Expected ValidatedKeyboardEvent, got ValidatedClickEvent")
     }
 
