@@ -37,7 +37,7 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
                 ])
             )
 
-            if let modifier = accessModifier {
+            if let modifier = accessModifier, modifier != .private {
                 enumCase.modifiers = DeclModifierListSyntax([
                     DeclModifierSyntax(name: .keyword(modifier)),
                 ])
