@@ -12,9 +12,8 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
     public static func expansion(
         of node: AttributeSyntax,
         providingMembersOf declaration: some DeclGroupSyntax,
-        in context: some MacroExpansionContext
+        in _: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-
         guard let enumDecl = declaration.as(EnumDeclSyntax.self) else {
             throw TypeUnionError.notAnEnum
         }
@@ -31,16 +30,16 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
                             parameters: EnumCaseParameterListSyntax([
                                 EnumCaseParameterSyntax(
                                     type: IdentifierTypeSyntax(name: .identifier(typeInfo.typeName))
-                                )
+                                ),
                             ])
                         )
-                    )
+                    ),
                 ])
             )
 
             if let modifier = accessModifier {
                 enumCase.modifiers = DeclModifierListSyntax([
-                    DeclModifierSyntax(name: .keyword(modifier))
+                    DeclModifierSyntax(name: .keyword(modifier)),
                 ])
             }
 
@@ -56,10 +55,9 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
         of node: AttributeSyntax,
         attachedTo declaration: some DeclGroupSyntax,
         providingExtensionsOf type: some TypeSyntaxProtocol,
-        conformingTo protocols: [TypeSyntax],
-        in context: some MacroExpansionContext
+        conformingTo _: [TypeSyntax],
+        in _: some MacroExpansionContext
     ) throws -> [ExtensionDeclSyntax] {
-
         guard let enumDecl = declaration.as(EnumDeclSyntax.self) else {
             throw TypeUnionError.notAnEnum
         }
@@ -89,11 +87,11 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
 
         for argument in arguments {
             if let memberAccess = argument.expression.as(MemberAccessExprSyntax.self),
-                let baseExpr = memberAccess.base?.as(DeclReferenceExprSyntax.self),
-                memberAccess.declName.baseName.text == "self"
+               let baseExpr = memberAccess.base?.as(DeclReferenceExprSyntax.self),
+               memberAccess.declName.baseName.text == "self"
             {
                 let typeName = baseExpr.baseName.text
-                let caseName = typeName
+                let caseName = typeName.prefix(1).lowercased() + typeName.dropFirst()
                 typeInfos.append(TypeInfo(typeName: typeName, caseName: caseName))
             }
         }
@@ -108,7 +106,7 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
     private static func createInitFromDecoder(cases: [TypeInfo], accessModifier: Keyword?) throws
         -> InitializerDeclSyntax
     {
-        let accessPrefix = accessModifier != nil ? "\(accessModifier!) " : ""
+        let accessPrefix = accessModifier.flatMap { $0 == .private ? nil : $0 }.map { "\($0) " } ?? ""
 
         return try InitializerDeclSyntax(
             "\(raw: accessPrefix)init(from decoder: Decoder) throws"
@@ -142,9 +140,8 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
         }
     }
 
-    private static func createEncodeToEncoder(cases: [TypeInfo], accessModifier: Keyword?) throws -> FunctionDeclSyntax
-    {
-        let accessPrefix = accessModifier != nil ? "\(accessModifier!) " : ""
+    private static func createEncodeToEncoder(cases: [TypeInfo], accessModifier: Keyword?) throws -> FunctionDeclSyntax {
+        let accessPrefix = accessModifier.flatMap { $0 == .private ? nil : $0 }.map { "\($0) " } ?? ""
 
         return try FunctionDeclSyntax(
             "\(raw: accessPrefix)func encode(to encoder: Encoder) throws"
@@ -177,7 +174,6 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
         }
         """
     }
-
 }
 
 /// Information about a type used in a type union.

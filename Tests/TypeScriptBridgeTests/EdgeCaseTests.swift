@@ -194,8 +194,8 @@ enum DuplicateUnion {}
     let test1 = DuplicateNameTest1(status: .test)
     let test2 = DuplicateNameTest2(status: .test)
 
-    let union1 = DuplicateUnion.DuplicateNameTest1(test1)
-    let union2 = DuplicateUnion.DuplicateNameTest2(test2)
+    let union1 = DuplicateUnion.duplicateNameTest1(test1)
+    let union2 = DuplicateUnion.duplicateNameTest2(test2)
 
     // Test first duplicate
     let encoder = JSONEncoder()
@@ -205,9 +205,9 @@ enum DuplicateUnion {}
     let decoded1 = try decoder.decode(DuplicateUnion.self, from: data1)
 
     switch decoded1 {
-    case .DuplicateNameTest1(let event):
+    case .duplicateNameTest1(let event):
         #expect(event.status.rawValue == "test")
-    case .DuplicateNameTest2:
+    case .duplicateNameTest2:
         Issue.record("Expected DuplicateNameTest1")
     }
 
@@ -217,10 +217,10 @@ enum DuplicateUnion {}
 
     // Both will decode as DuplicateNameTest1 since they have identical JSON structure
     switch decoded2 {
-    case .DuplicateNameTest1(let event):
+    case .duplicateNameTest1(let event):
         #expect(event.status.rawValue == "test")
     // This is expected behavior - macro uses first matching type
-    case .DuplicateNameTest2:
+    case .duplicateNameTest2:
         // This won't happen due to identical structure
         Issue.record("Unexpected: DuplicateNameTest2 was matched")
     }
@@ -318,11 +318,11 @@ enum LargeUnion {}
 
 @Test func testLargeUnionWithManyMembers() async throws {
     let members: [LargeUnion] = [
-        .LargeUnionMember1(LargeUnionMember1(kind: .type1, data: "test data")),
-        .LargeUnionMember2(LargeUnionMember2(kind: .type2, value: 42)),
-        .LargeUnionMember3(LargeUnionMember3(kind: .type3, items: ["a", "b", "c"])),
-        .LargeUnionMember4(LargeUnionMember4(kind: .type4, metadata: ["key": "value"])),
-        .LargeUnionMember5(LargeUnionMember5(kind: .type5, timestamp: Date())),
+        .largeUnionMember1(LargeUnionMember1(kind: .type1, data: "test data")),
+        .largeUnionMember2(LargeUnionMember2(kind: .type2, value: 42)),
+        .largeUnionMember3(LargeUnionMember3(kind: .type3, items: ["a", "b", "c"])),
+        .largeUnionMember4(LargeUnionMember4(kind: .type4, metadata: ["key": "value"])),
+        .largeUnionMember5(LargeUnionMember5(kind: .type5, timestamp: Date())),
     ]
 
     let encoder = JSONEncoder()
@@ -336,19 +336,19 @@ enum LargeUnion {}
         let decoded = try decoder.decode(LargeUnion.self, from: data)
 
         switch (member, decoded) {
-        case (.LargeUnionMember1(let orig), .LargeUnionMember1(let dec)):
+        case (.largeUnionMember1(let orig), .largeUnionMember1(let dec)):
             #expect(orig.kind.rawValue == dec.kind.rawValue)
             #expect(orig.data == dec.data)
-        case (.LargeUnionMember2(let orig), .LargeUnionMember2(let dec)):
+        case (.largeUnionMember2(let orig), .largeUnionMember2(let dec)):
             #expect(orig.kind.rawValue == dec.kind.rawValue)
             #expect(orig.value == dec.value)
-        case (.LargeUnionMember3(let orig), .LargeUnionMember3(let dec)):
+        case (.largeUnionMember3(let orig), .largeUnionMember3(let dec)):
             #expect(orig.kind.rawValue == dec.kind.rawValue)
             #expect(orig.items == dec.items)
-        case (.LargeUnionMember4(let orig), .LargeUnionMember4(let dec)):
+        case (.largeUnionMember4(let orig), .largeUnionMember4(let dec)):
             #expect(orig.kind.rawValue == dec.kind.rawValue)
             #expect(orig.metadata == dec.metadata)
-        case (.LargeUnionMember5(let orig), .LargeUnionMember5(let dec)):
+        case (.largeUnionMember5(let orig), .largeUnionMember5(let dec)):
             #expect(orig.kind.rawValue == dec.kind.rawValue)
             #expect(abs(orig.timestamp.timeIntervalSince(dec.timestamp)) < 1.0)
         default:
@@ -367,15 +367,15 @@ enum LargeUnion {}
         let event: LargeUnion
         switch i % 5 {
         case 0:
-            event = .LargeUnionMember1(LargeUnionMember1(kind: .type1, data: "data\(i)"))
+            event = .largeUnionMember1(LargeUnionMember1(kind: .type1, data: "data\(i)"))
         case 1:
-            event = .LargeUnionMember2(LargeUnionMember2(kind: .type2, value: i))
+            event = .largeUnionMember2(LargeUnionMember2(kind: .type2, value: i))
         case 2:
-            event = .LargeUnionMember3(LargeUnionMember3(kind: .type3, items: ["item\(i)"]))
+            event = .largeUnionMember3(LargeUnionMember3(kind: .type3, items: ["item\(i)"]))
         case 3:
-            event = .LargeUnionMember4(LargeUnionMember4(kind: .type4, metadata: ["index": "\(i)"]))
+            event = .largeUnionMember4(LargeUnionMember4(kind: .type4, metadata: ["index": "\(i)"]))
         default:
-            event = .LargeUnionMember5(LargeUnionMember5(kind: .type5, timestamp: Date()))
+            event = .largeUnionMember5(LargeUnionMember5(kind: .type5, timestamp: Date()))
         }
         events.append(event)
     }
@@ -393,15 +393,15 @@ enum LargeUnion {}
     // Spot check a few elements
     for i in [0, 10, 50, 100, 500, 999] {
         switch (events[i], decoded[i]) {
-        case (.LargeUnionMember1(let orig), .LargeUnionMember1(let dec)):
+        case (.largeUnionMember1(let orig), .largeUnionMember1(let dec)):
             #expect(orig.data == dec.data)
-        case (.LargeUnionMember2(let orig), .LargeUnionMember2(let dec)):
+        case (.largeUnionMember2(let orig), .largeUnionMember2(let dec)):
             #expect(orig.value == dec.value)
-        case (.LargeUnionMember3(let orig), .LargeUnionMember3(let dec)):
+        case (.largeUnionMember3(let orig), .largeUnionMember3(let dec)):
             #expect(orig.items == dec.items)
-        case (.LargeUnionMember4(let orig), .LargeUnionMember4(let dec)):
+        case (.largeUnionMember4(let orig), .largeUnionMember4(let dec)):
             #expect(orig.metadata == dec.metadata)
-        case (.LargeUnionMember5, .LargeUnionMember5):
+        case (.largeUnionMember5, .largeUnionMember5):
             // Date comparison is approximate
             break
         default:

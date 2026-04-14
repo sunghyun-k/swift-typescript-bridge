@@ -56,7 +56,7 @@ struct InternalMessage: Codable {
 
 @Test func testPublicTypeUnionAccessModifiers() async throws {
     let user = PublicUser(name: "Alice", age: 30)
-    let union = PublicUnion.PublicUser(user)
+    let union = PublicUnion.publicUser(user)
 
     let encoder = JSONEncoder()
     let data = try encoder.encode(union)
@@ -65,10 +65,10 @@ struct InternalMessage: Codable {
     let decoded = try decoder.decode(PublicUnion.self, from: data)
 
     switch decoded {
-    case .PublicUser(let decodedUser):
+    case .publicUser(let decodedUser):
         #expect(decodedUser.name == "Alice")
         #expect(decodedUser.age == 30)
-    case .PublicMessage:
+    case .publicMessage:
         Issue.record("Expected PublicUser")
     }
 }
@@ -87,7 +87,7 @@ struct InternalMessage: Codable {
 
 @Test func testInternalTypeUnionAccessModifiers() async throws {
     let user = InternalUser(name: "Bob", age: 25)
-    let union = InternalUnion.InternalUser(user)
+    let union = InternalUnion.internalUser(user)
 
     let encoder = JSONEncoder()
     let data = try encoder.encode(union)
@@ -96,10 +96,10 @@ struct InternalMessage: Codable {
     let decoded = try decoder.decode(InternalUnion.self, from: data)
 
     switch decoded {
-    case .InternalUser(let decodedUser):
+    case .internalUser(let decodedUser):
         #expect(decodedUser.name == "Bob")
         #expect(decodedUser.age == 25)
-    case .InternalMessage:
+    case .internalMessage:
         Issue.record("Expected InternalUser")
     }
 }
@@ -109,8 +109,8 @@ struct InternalMessage: Codable {
     let publicUser = PublicUser(name: "Charlie", age: 35)
     let internalUser = InternalUser(name: "David", age: 40)
 
-    let publicUnion = PublicUnion.PublicUser(publicUser)
-    let internalUnion = InternalUnion.InternalUser(internalUser)
+    let publicUnion = PublicUnion.publicUser(publicUser)
+    let internalUnion = InternalUnion.internalUser(internalUser)
 
     let encoder = JSONEncoder()
 
@@ -123,16 +123,16 @@ struct InternalMessage: Codable {
     let decodedInternal = try decoder.decode(InternalUnion.self, from: internalData)
 
     switch decodedPublic {
-    case .PublicUser(let user):
+    case .publicUser(let user):
         #expect(user.name == "Charlie")
-    case .PublicMessage:
+    case .publicMessage:
         Issue.record("Expected PublicUser")
     }
 
     switch decodedInternal {
-    case .InternalUser(let user):
+    case .internalUser(let user):
         #expect(user.name == "David")
-    case .InternalMessage:
+    case .internalMessage:
         Issue.record("Expected InternalUser")
     }
 }

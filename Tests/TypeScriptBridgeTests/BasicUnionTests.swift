@@ -36,30 +36,30 @@ struct BasicKeyboardEvent: Codable {
 
 @Test func testTypeUnionMacro() async throws {
     let clickEvent = BasicClickEvent(type: .click, coordinates: ["100", "200"])
-    let uiEvent = BasicUIEvent.BasicClickEvent(clickEvent)
+    let uiEvent = BasicUIEvent.basicClickEvent(clickEvent)
 
     let data = try encodeToJSON(uiEvent)
     let decodedEvent = try decodeFromJSON(BasicUIEvent.self, from: data)
 
     switch decodedEvent {
-    case .BasicClickEvent(let event):
+    case .basicClickEvent(let event):
         #expect(event.coordinates == ["100", "200"])
-    case .BasicKeyboardEvent:
+    case .basicKeyboardEvent:
         Issue.record("Expected BasicClickEvent, got BasicKeyboardEvent")
     }
 }
 
 @Test func testKeyboardEvent() async throws {
     let keyboardEvent = BasicKeyboardEvent(type: .keydown, key: "Enter")
-    let uiEvent = BasicUIEvent.BasicKeyboardEvent(keyboardEvent)
+    let uiEvent = BasicUIEvent.basicKeyboardEvent(keyboardEvent)
 
     let data = try encodeToJSON(uiEvent)
     let decodedEvent = try decodeFromJSON(BasicUIEvent.self, from: data)
 
     switch decodedEvent {
-    case .BasicKeyboardEvent(let event):
+    case .basicKeyboardEvent(let event):
         #expect(event.key == "Enter")
-    case .BasicClickEvent:
+    case .basicClickEvent:
         Issue.record("Expected BasicKeyboardEvent, got BasicClickEvent")
     }
 }
@@ -97,10 +97,10 @@ struct BasicKeyboardEvent: Codable {
     let clickUIEvent = try decodeFromJSON(BasicUIEvent.self, from: clickEventJSON)
 
     switch clickUIEvent {
-    case .BasicClickEvent(let event):
+    case .basicClickEvent(let event):
         #expect(event.type.rawValue == "click")
         #expect(event.coordinates == ["100", "200"])
-    case .BasicKeyboardEvent:
+    case .basicKeyboardEvent:
         Issue.record("Expected BasicClickEvent, got BasicKeyboardEvent")
     }
 
@@ -108,10 +108,10 @@ struct BasicKeyboardEvent: Codable {
     let keyboardUIEvent = try decodeFromJSON(BasicUIEvent.self, from: keyboardEventJSON)
 
     switch keyboardUIEvent {
-    case .BasicKeyboardEvent(let event):
+    case .basicKeyboardEvent(let event):
         #expect(event.type.rawValue == "keyup")
         #expect(event.key == "Escape")
-    case .BasicClickEvent:
+    case .basicClickEvent:
         Issue.record("Expected BasicKeyboardEvent, got BasicClickEvent")
     }
 }
@@ -168,9 +168,9 @@ struct SimpleB: Codable {
     let unionA = try decodeFromJSON(SimpleUnion.self, from: simpleAJSON)
 
     switch unionA {
-    case .SimpleA(let event):
+    case .simpleA(let event):
         #expect(event.value == "test")
-    case .SimpleB:
+    case .simpleB:
         Issue.record("Should decode as SimpleA (first matching type)")
     }
 
@@ -188,9 +188,9 @@ struct SimpleB: Codable {
 
     // Will decode as SimpleA due to first-match behavior
     switch unionB {
-    case .SimpleA(let event):
+    case .simpleA(let event):
         #expect(event.value == "test")
-    case .SimpleB:
+    case .simpleB:
         // SimpleB would only be selected if SimpleA failed to decode
         Issue.record("Decoded as SimpleB (unexpected but valid)")
     }

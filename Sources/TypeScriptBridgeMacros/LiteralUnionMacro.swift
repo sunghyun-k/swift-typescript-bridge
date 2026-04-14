@@ -13,9 +13,8 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
     public static func expansion(
         of node: AttributeSyntax,
         providingMembersOf declaration: some DeclGroupSyntax,
-        in context: some MacroExpansionContext
+        in _: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-
         guard let enumDecl = declaration.as(EnumDeclSyntax.self) else {
             throw LiteralUnionError.invalidDeclaration
         }
@@ -26,13 +25,13 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
         let enumCases = literals.map { literal in
             var enumCase = EnumCaseDeclSyntax(
                 elements: EnumCaseElementListSyntax([
-                    EnumCaseElementSyntax(name: .identifier(literal.enumCaseName))
+                    EnumCaseElementSyntax(name: .identifier(literal.enumCaseName)),
                 ])
             )
 
             if let modifier = accessModifier {
                 enumCase.modifiers = DeclModifierListSyntax([
-                    DeclModifierSyntax(name: .keyword(modifier))
+                    DeclModifierSyntax(name: .keyword(modifier)),
                 ])
             }
 
@@ -46,17 +45,16 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
         of node: AttributeSyntax,
         attachedTo declaration: some DeclGroupSyntax,
         providingExtensionsOf type: some TypeSyntaxProtocol,
-        conformingTo protocols: [TypeSyntax],
-        in context: some MacroExpansionContext
+        conformingTo _: [TypeSyntax],
+        in _: some MacroExpansionContext
     ) throws -> [ExtensionDeclSyntax] {
-
         guard let enumDecl = declaration.as(EnumDeclSyntax.self) else {
             throw LiteralUnionError.invalidDeclaration
         }
 
         let literals = try extractLiterals(from: node)
         let accessModifier = MacroUtils.extractAccessModifier(from: enumDecl)
-        let accessPrefix = accessModifier != nil ? "\(accessModifier!) " : ""
+        let accessPrefix = accessModifier.flatMap { $0 == .private ? nil : $0 }.map { "\($0) " } ?? ""
 
         // Get the Swift type for the literal values
         let literalType = determineLiteralType(from: literals)
@@ -77,7 +75,7 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
                 }
                 .joined(separator: "\n")
 
-            let decodingCases = 
+            let decodingCases =
                 literals.map { literal in
                     "if let value = try? container.decode(\(literal.swiftTypeName).self), value == \(literal.swiftLiteral) { self = .\(literal.enumCaseName); return }"
                 }
@@ -171,7 +169,7 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
 
         for argument in arguments {
             if let stringLiteral = argument.expression.as(StringLiteralExprSyntax.self),
-                let segment = stringLiteral.segments.first?.as(StringSegmentSyntax.self)
+               let segment = stringLiteral.segments.first?.as(StringSegmentSyntax.self)
             {
                 literals.append(.string(segment.content.text))
             } else if let intLiteral = argument.expression.as(IntegerLiteralExprSyntax.self) {
@@ -199,16 +197,15 @@ public struct LiteralUnionMacro: MemberMacro, ExtensionMacro {
 
     private static func determineLiteralType(from literals: [LiteralValue]) -> String {
         let types = Set(literals.map { $0.swiftTypeName })
-        
+
         // If all same type, use that type
         if types.count == 1 {
             return types.first!
         }
-        
+
         // For mixed types, use any _LiteralType to support all literal types
         return "any _LiteralType"
     }
-
 }
 
 /// Represents different types of literal values that can be used in union types
@@ -217,42 +214,42 @@ enum LiteralValue {
     case int(Int)
     case double(Double)
     case bool(Bool)
-    
+
     /// Returns the Swift literal representation of this value
     var swiftLiteral: String {
         switch self {
-        case .string(let value):
+        case let .string(value):
             return "\"\(value)\""
-        case .int(let value):
+        case let .int(value):
             return "\(value)"
-        case .double(let value):
+        case let .double(value):
             return "\(value)"
-        case .bool(let value):
+        case let .bool(value):
             return "\(value)"
         }
     }
-    
+
     /// Returns the Swift literal representation converted to target type
     func swiftLiteral(as targetType: String) -> String {
         switch targetType {
         case "Double":
             switch self {
-            case .int(let value):
+            case let .int(value):
                 return "\(Double(value))"
-            case .double(let value):
+            case let .double(value):
                 return "\(value)"
             default:
                 return swiftLiteral
             }
         case "String":
             switch self {
-            case .string(let value):
+            case let .string(value):
                 return "\"\(value)\""
-            case .int(let value):
+            case let .int(value):
                 return "\"\(value)\""
-            case .double(let value):
+            case let .double(value):
                 return "\"\(value)\""
-            case .bool(let value):
+            case let .bool(value):
                 return "\"\(value)\""
             }
         case "any _LiteralType":
@@ -262,21 +259,21 @@ enum LiteralValue {
             return swiftLiteral
         }
     }
-    
+
     /// Returns the enum case name for this literal
     var enumCaseName: String {
         switch self {
-        case .string(let value):
+        case let .string(value):
             return "`\(value)`"
-        case .int(let value):
+        case let .int(value):
             return "`\(value)`"
-        case .double(let value):
+        case let .double(value):
             return "`\(value)`"
-        case .bool(let value):
+        case let .bool(value):
             return "`\(value)`"
         }
     }
-    
+
     /// Returns the underlying Swift type name
     var swiftTypeName: String {
         switch self {
@@ -311,7 +308,7 @@ enum LiteralUnionError: Error, CustomStringConvertible {
             return "@Union requires literal arguments"
         case .noValidLiterals:
             return "@Union requires at least one valid literal (String, Int, Double, or Bool)"
-        case .unsupportedLiteralType(let type):
+        case let .unsupportedLiteralType(type):
             return "@Union does not support '\(type)' literals. Supported types: String, Int, Double, Bool"
         }
     }

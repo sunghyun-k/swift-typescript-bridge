@@ -42,8 +42,8 @@ struct DataEvent: Codable {
 
     // Package into system events
     let systemEvents: [IntegrationSystemEvent] = [
-        .AuthEvent(loginEvent),
-        .DataEvent(updateEvent),
+        .authEvent(loginEvent),
+        .dataEvent(updateEvent),
     ]
 
     // Encode all events
@@ -60,20 +60,20 @@ struct DataEvent: Codable {
 
     // Verify first event
     switch decodedEvents[0] {
-    case .AuthEvent(let event):
+    case .authEvent(let event):
         #expect(event.type.rawValue == "login")
         #expect(event.userId == "user123")
-    case .DataEvent:
+    case .dataEvent:
         Issue.record("Expected AuthEvent")
     }
 
     // Verify second event
     switch decodedEvents[1] {
-    case .DataEvent(let event):
+    case .dataEvent(let event):
         #expect(event.operation.rawValue == "update")
         #expect(event.entityId == "entity456")
         #expect(event.changes?["name"] == "New Name")
-    case .AuthEvent:
+    case .authEvent:
         Issue.record("Expected DataEvent")
     }
 }
@@ -117,10 +117,10 @@ struct DataEvent: Codable {
 @Test func testSystemEventTypeDiscrimination() async throws {
     // Test that the system can correctly discriminate between different event types
     let mixedEvents: [IntegrationSystemEvent] = [
-        .AuthEvent(AuthEvent(type: .login, userId: "user1", timestamp: Date())),
-        .DataEvent(DataEvent(operation: .create, entityId: "entity1", changes: ["key": "value"])),
-        .AuthEvent(AuthEvent(type: .logout, userId: "user2", timestamp: Date())),
-        .DataEvent(DataEvent(operation: .delete, entityId: "entity2", changes: nil)),
+        .authEvent(AuthEvent(type: .login, userId: "user1", timestamp: Date())),
+        .dataEvent(DataEvent(operation: .create, entityId: "entity1", changes: ["key": "value"])),
+        .authEvent(AuthEvent(type: .logout, userId: "user2", timestamp: Date())),
+        .dataEvent(DataEvent(operation: .delete, entityId: "entity2", changes: nil)),
     ]
 
     let encoder = JSONEncoder()
@@ -138,9 +138,9 @@ struct DataEvent: Codable {
 
     for (index, (isAuth, isData)) in expectedTypes.enumerated() {
         switch decoded[index] {
-        case .AuthEvent:
+        case .authEvent:
             #expect(isAuth, "Event \(index) should be AuthEvent")
-        case .DataEvent:
+        case .dataEvent:
             #expect(isData, "Event \(index) should be DataEvent")
         }
     }

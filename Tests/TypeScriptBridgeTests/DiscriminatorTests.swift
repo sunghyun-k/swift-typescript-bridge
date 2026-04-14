@@ -63,10 +63,10 @@ struct TextEvent: Codable {
     let clickUIEvent = try decoder.decode(DiscUIEvent.self, from: clickData)
 
     switch clickUIEvent {
-    case .DiscClickEvent(let event):
+    case .discClickEvent(let event):
         #expect(event.type.rawValue == "click")
         #expect(event.coordinates == ["100", "200"])
-    case .DiscKeyboardEvent:
+    case .discKeyboardEvent:
         Issue.record("Should decode as ClickEvent based on discriminator")
     }
 
@@ -75,10 +75,10 @@ struct TextEvent: Codable {
     let keyboardUIEvent = try decoder.decode(DiscUIEvent.self, from: keyboardData)
 
     switch keyboardUIEvent {
-    case .DiscKeyboardEvent(let event):
+    case .discKeyboardEvent(let event):
         #expect(event.type.rawValue == "keydown")
         #expect(event.key == "Enter")
-    case .DiscClickEvent:
+    case .discClickEvent:
         Issue.record("Should decode as KeyboardEvent based on discriminator")
     }
 }
@@ -108,9 +108,9 @@ struct TextEvent: Codable {
     let mediaContent = try decoder.decode(ContentEvent.self, from: mediaData)
 
     switch mediaContent {
-    case .MediaEvent(let event):
+    case .mediaEvent(let event):
         #expect(event.type.rawValue == "video")
-    case .TextEvent:
+    case .textEvent:
         Issue.record("Should decode as MediaEvent")
     }
 
@@ -119,9 +119,9 @@ struct TextEvent: Codable {
     let textContent = try decoder.decode(ContentEvent.self, from: textData)
 
     switch textContent {
-    case .TextEvent(let event):
+    case .textEvent(let event):
         #expect(event.format.rawValue == "markdown")
-    case .MediaEvent:
+    case .mediaEvent:
         Issue.record("Should decode as TextEvent")
     }
 }
@@ -148,7 +148,7 @@ struct TextEvent: Codable {
         metadata: ["duration": "120", "quality": "1080p"]
     )
 
-    let contentEvent = ContentEvent.MediaEvent(mediaEvent)
+    let contentEvent = ContentEvent.mediaEvent(mediaEvent)
 
     let encoder = JSONEncoder()
     let data = try encoder.encode(contentEvent)
@@ -157,12 +157,12 @@ struct TextEvent: Codable {
     let decoded = try decoder.decode(ContentEvent.self, from: data)
 
     switch decoded {
-    case .MediaEvent(let event):
+    case .mediaEvent(let event):
         #expect(event.type.rawValue == "video")
         #expect(event.url == "https://example.com/video.mp4")
         #expect(event.metadata?["duration"] == "120")
         #expect(event.metadata?["quality"] == "1080p")
-    case .TextEvent:
+    case .textEvent:
         Issue.record("Expected MediaEvent")
     }
 }
@@ -174,7 +174,7 @@ struct TextEvent: Codable {
         length: 25
     )
 
-    let contentEvent = ContentEvent.TextEvent(textEvent)
+    let contentEvent = ContentEvent.textEvent(textEvent)
 
     let encoder = JSONEncoder()
     let data = try encoder.encode(contentEvent)
@@ -183,11 +183,11 @@ struct TextEvent: Codable {
     let decoded = try decoder.decode(ContentEvent.self, from: data)
 
     switch decoded {
-    case .TextEvent(let event):
+    case .textEvent(let event):
         #expect(event.format.rawValue == "markdown")
         #expect(event.content == "# 제목\n\n이것은 **마크다운** 텍스트입니다.")
         #expect(event.length == 25)
-    case .MediaEvent:
+    case .mediaEvent:
         Issue.record("Expected TextEvent")
     }
 }

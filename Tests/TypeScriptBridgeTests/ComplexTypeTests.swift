@@ -175,7 +175,7 @@ struct InteractionEvent: Codable {
     let wsMessage = WebSocketMessage(
         id: "msg789",
         timestamp: Date(),
-        payload: .ChatMessage(chatMessage)
+        payload: .chatMessage(chatMessage)
     )
 
     let encoder = JSONEncoder()
@@ -189,7 +189,7 @@ struct InteractionEvent: Codable {
     #expect(decoded.id == "msg789")
 
     switch decoded.payload {
-    case .ChatMessage(let message):
+    case .chatMessage(let message):
         #expect(message.type.rawValue == "text")
         #expect(message.content == "안녕하세요!")
         #expect(message.senderId == "user456")
@@ -210,7 +210,7 @@ struct InteractionEvent: Codable {
     let wsMessage = WebSocketMessage(
         id: "notif001",
         timestamp: Date(),
-        payload: .SystemNotification(notification)
+        payload: .systemNotification(notification)
     )
 
     let encoder = JSONEncoder()
@@ -222,7 +222,7 @@ struct InteractionEvent: Codable {
     let decoded = try decoder.decode(WebSocketMessage.self, from: data)
 
     switch decoded.payload {
-    case .SystemNotification(let notif):
+    case .systemNotification(let notif):
         #expect(notif.priority.rawValue == "critical")
         #expect(notif.title == "시스템 점검 안내")
         #expect(notif.actionRequired == true)
@@ -239,7 +239,7 @@ struct InteractionEvent: Codable {
         affectedRows: 1
     )
 
-    let systemEvent = ComplexSystemEvent.DatabaseEvent(dbEvent)
+    let systemEvent = ComplexSystemEvent.databaseEvent(dbEvent)
 
     let encoder = JSONEncoder()
     let data = try encoder.encode(systemEvent)
@@ -248,7 +248,7 @@ struct InteractionEvent: Codable {
     let decoded = try decoder.decode(ComplexSystemEvent.self, from: data)
 
     switch decoded {
-    case .DatabaseEvent(let event):
+    case .databaseEvent(let event):
         #expect(event.operation.rawValue == "insert")
         #expect(event.table == "users")
         #expect(event.recordId == "12345")
@@ -266,7 +266,7 @@ struct InteractionEvent: Codable {
         viewport: ViewportSize(width: 1920, height: 1080)
     )
 
-    let systemEvent = ComplexSystemEvent.InteractionEvent(interactionEvent)
+    let systemEvent = ComplexSystemEvent.interactionEvent(interactionEvent)
 
     let encoder = JSONEncoder()
     let data = try encoder.encode(systemEvent)
@@ -275,7 +275,7 @@ struct InteractionEvent: Codable {
     let decoded = try decoder.decode(ComplexSystemEvent.self, from: data)
 
     switch decoded {
-    case .InteractionEvent(let event):
+    case .interactionEvent(let event):
         #expect(event.type.rawValue == "click")
         #expect(event.elementId == "submit-button")
         #expect(event.coordinates?[0] == 100.5)
@@ -298,7 +298,7 @@ struct InteractionEvent: Codable {
     let wsMessage = WebSocketMessage(
         id: "error001",
         timestamp: Date(),
-        payload: .ErrorReport(errorReport)
+        payload: .errorReport(errorReport)
     )
 
     let encoder = JSONEncoder()
@@ -310,7 +310,7 @@ struct InteractionEvent: Codable {
     let decoded = try decoder.decode(WebSocketMessage.self, from: data)
 
     switch decoded.payload {
-    case .ErrorReport(let error):
+    case .errorReport(let error):
         #expect(error.category.rawValue == "network")
         #expect(error.code == 404)
         #expect(error.message == "페이지를 찾을 수 없습니다")

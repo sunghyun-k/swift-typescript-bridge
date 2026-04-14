@@ -1,5 +1,5 @@
-import Testing
 import Foundation
+import Testing
 @testable import TypeScriptBridge
 
 // MARK: - Test Helpers
@@ -88,11 +88,11 @@ enum TestError: Error, CustomStringConvertible {
         switch self {
         case .invalidJSONString:
             return "Invalid JSON string"
-        case .unexpectedCase(let message):
+        case let .unexpectedCase(message):
             return "Unexpected case: \(message)"
         case .unexpectedSuccess:
             return "Expected decoding to fail, but it succeeded"
-        case .unexpectedErrorType(let error):
+        case let .unexpectedErrorType(error):
             return "Expected DecodingError, but got \(type(of: error)): \(error)"
         }
     }
