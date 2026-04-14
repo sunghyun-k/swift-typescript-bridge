@@ -42,7 +42,7 @@ enum Status: String, Codable {
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/sunghyun-k/swift-typescript-bridge.git", from: "0.1.0")
+    .package(url: "https://github.com/sunghyun-k/swift-typescript-bridge.git", from: "0.3.0")
 ]
 ```
 
@@ -94,7 +94,7 @@ type Entity = User | Organization;
 @Union(User.self, Organization.self) enum Entity {}
 
 let user = User(name: "Alice")
-let entity = Entity.User(user)
+let entity = Entity.user(user)
 ```
 
 ### 3. Discriminated Unions
