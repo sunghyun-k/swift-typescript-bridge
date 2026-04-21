@@ -172,7 +172,6 @@ struct BaseEvent: Codable {
 }
 
 @Extends(BaseEvent.self)
-@dynamicMemberLookup
 struct ClickEvent {
     var x: Int
     var y: Int
@@ -185,7 +184,7 @@ c.x          // 10
 // JSON: {"timestamp":0,"x":10,"y":20} — flat!
 ```
 
-**부모 프로퍼티 좁히기:** 자식이 부모 프로퍼티를 재선언해 타입을 좁힐 수 있습니다 (예: 부모의 `String` → 자식의 literal union). 자식의 stored property가 `@dynamicMemberLookup`보다 우선 해석되며, 좁혀진 타입이 디코드 시 강제됩니다.
+**부모 프로퍼티 좁히기:** 자식이 부모 프로퍼티를 재선언해 타입을 좁힐 수 있습니다 (예: 부모의 `String` → 자식의 literal union). 자식의 stored property가 forwarding된 부모 프로퍼티보다 우선 해석되며, 좁혀진 타입이 디코드 시 강제됩니다.
 
 ```swift
 struct Event: Codable {
@@ -194,7 +193,6 @@ struct Event: Codable {
 }
 
 @Extends(Event.self)
-@dynamicMemberLookup
 struct ClickEvent {
     @Union("click") enum Kind {}
     var kind: Kind     // 자식: "click"으로 좁힘
@@ -203,7 +201,6 @@ struct ClickEvent {
 
 **제약:**
 
-- `@dynamicMemberLookup`은 struct에 직접 선언해야 합니다 — 없으면 `c.timestamp`는 해석되지 않고, `c._parent.timestamp` 형태로만 접근 가능합니다
 - JSON 표현이 호환되지 않는 프로퍼티 오버라이드는 디코드 실패 (예: 부모 `Int`, 자식 `String`)
 - MVP는 단일 parent만 지원
 

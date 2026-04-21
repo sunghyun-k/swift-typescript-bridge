@@ -172,7 +172,6 @@ struct BaseEvent: Codable {
 }
 
 @Extends(BaseEvent.self)
-@dynamicMemberLookup
 struct ClickEvent {
     var x: Int
     var y: Int
@@ -185,7 +184,7 @@ c.x          // 10
 // JSON: {"timestamp":0,"x":10,"y":20} — flat!
 ```
 
-**Narrowing parent properties:** A child can redeclare a parent property to narrow its type (e.g., parent's `String` → child's literal union). The child's stored property shadows the parent via `@dynamicMemberLookup`, and the narrower type is enforced on decode.
+**Narrowing parent properties:** A child can redeclare a parent property to narrow its type (e.g., parent's `String` → child's literal union). The child's stored property shadows the forwarded parent property, and the narrower type is enforced on decode.
 
 ```swift
 struct Event: Codable {
@@ -194,7 +193,6 @@ struct Event: Codable {
 }
 
 @Extends(Event.self)
-@dynamicMemberLookup
 struct ClickEvent {
     @Union("click") enum Kind {}
     var kind: Kind     // child: narrowed to "click"
@@ -203,7 +201,6 @@ struct ClickEvent {
 
 **Limitations:**
 
-- `@dynamicMemberLookup` must be declared on the struct yourself — without it, `c.timestamp` won't resolve; parent fields are still accessible via `c._parent.timestamp`.
 - Property overrides with incompatible JSON representations (e.g., parent `Int`, child `String`) will fail to decode.
 - MVP supports a single parent only.
 

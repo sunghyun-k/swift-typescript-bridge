@@ -134,11 +134,27 @@ extension Int: _LiteralType {}
 extension Double: _LiteralType {}
 extension Bool: _LiteralType {}
 
+/// Internal-use protocol that enables implicit keypath forwarding for `@Extends`-decorated
+/// structs. Users do not conform to this directly — `@Extends` adds the conformance.
+@dynamicMemberLookup
+public protocol _ExtendsParent {
+    associatedtype Parent
+    var _parent: Parent { get set }
+}
+
+extension _ExtendsParent {
+    public subscript<T>(dynamicMember keyPath: WritableKeyPath<Parent, T>) -> T {
+        get { _parent[keyPath: keyPath] }
+        set { _parent[keyPath: keyPath] = newValue }
+    }
+
+    public subscript<T>(dynamicMember keyPath: KeyPath<Parent, T>) -> T {
+        _parent[keyPath: keyPath]
+    }
+}
+
 /// A macro that gives a struct TypeScript-style `extends` semantics: stored parent,
-/// flat JSON Codable, and keypath forwarding via `@dynamicMemberLookup`.
-///
-/// Add `@dynamicMemberLookup` on the struct alongside `@Extends` to enable
-/// implicit property forwarding. Without it, parent fields are accessible via `._parent`.
+/// flat JSON Codable, and keypath forwarding to parent properties.
 ///
 /// - Parameter parent: The parent type (e.g. `ParentType.self`).
 ///
@@ -149,7 +165,6 @@ extension Bool: _LiteralType {}
 /// }
 ///
 /// @Extends(BaseEvent.self)
-/// @dynamicMemberLookup
 /// struct ClickEvent {
 ///     var x: Int
 ///     var y: Int
@@ -164,6 +179,7 @@ extension Bool: _LiteralType {}
 @attached(
     extension,
     conformances: Codable,
+    _ExtendsParent,
     names: named(init(from:)),
     named(encode(to:)),
     named(CodingKeys)
