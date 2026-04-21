@@ -150,6 +150,47 @@ let response = try JSONDecoder().decode(ApiResponse.self, from: jsonData)
 
 **왜 판별 유니온이 중요한가:** `@UnionDiscriminator` 없이는 디코더가 성공할 때까지 각 타입을 순차적으로 시도합니다—느리고 오류가 발생하기 쉽습니다. 이 매크로를 사용하면 디코더가 판별자 필드를 먼저 확인하고 올바른 타입을 즉시 디코딩합니다.
 
+### 4. 타입 확장 (Extends)
+
+TypeScript의 `interface B extends A` 패턴을 Swift struct로 가져옵니다. flat JSON 인코딩/디코딩과 프로퍼티 forwarding을 자동 생성합니다.
+
+```typescript
+// TypeScript
+interface BaseEvent {
+    timestamp: number;
+}
+interface ClickEvent extends BaseEvent {
+    x: number;
+    y: number;
+}
+```
+
+```swift
+// Swift
+struct BaseEvent: Codable {
+    var timestamp: Double
+}
+
+@Extends(BaseEvent.self)
+@dynamicMemberLookup
+struct ClickEvent {
+    var x: Int
+    var y: Int
+}
+
+let c = ClickEvent(BaseEvent(timestamp: 0), x: 10, y: 20)
+c.timestamp  // BaseEvent에서 forwarding
+c.x          // 10
+
+// JSON: {"timestamp":0,"x":10,"y":20} — flat!
+```
+
+**제약:**
+
+- `@dynamicMemberLookup`은 struct에 직접 선언해야 합니다 — 없으면 `c.timestamp`는 해석되지 않고, `c._parent.timestamp` 형태로만 접근 가능합니다
+- 같은 이름 + 다른 타입의 프로퍼티 충돌은 미지원 (decode 실패)
+- MVP는 단일 parent만 지원
+
 ## 실제 사용 예시
 
 TypeScript 프론트엔드에서 보낸 웹 분석 이벤트 파싱:

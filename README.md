@@ -150,6 +150,47 @@ let response = try JSONDecoder().decode(ApiResponse.self, from: jsonData)
 
 **Why discriminated unions matter:** Without `@UnionDiscriminator`, the decoder tries each type sequentially until one succeeds—slow and error-prone. With it, the decoder checks the discriminator field first and decodes the correct type immediately.
 
+### 4. Type Extension (Extends)
+
+Bring TypeScript's `interface B extends A` pattern to Swift structs. Flat JSON encoding/decoding and property forwarding are generated automatically.
+
+```typescript
+// TypeScript
+interface BaseEvent {
+    timestamp: number;
+}
+interface ClickEvent extends BaseEvent {
+    x: number;
+    y: number;
+}
+```
+
+```swift
+// Swift
+struct BaseEvent: Codable {
+    var timestamp: Double
+}
+
+@Extends(BaseEvent.self)
+@dynamicMemberLookup
+struct ClickEvent {
+    var x: Int
+    var y: Int
+}
+
+let c = ClickEvent(BaseEvent(timestamp: 0), x: 10, y: 20)
+c.timestamp  // forwarded from BaseEvent
+c.x          // 10
+
+// JSON: {"timestamp":0,"x":10,"y":20} — flat!
+```
+
+**Limitations:**
+
+- `@dynamicMemberLookup` must be declared on the struct yourself — without it, `c.timestamp` won't resolve; parent fields are still accessible via `c._parent.timestamp`.
+- Property name collisions with different types across parent/child are not supported (decode will fail).
+- MVP supports a single parent only.
+
 ## Real-World Example
 
 Parse web analytics events from your TypeScript frontend:

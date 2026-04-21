@@ -133,3 +133,40 @@ extension String: _LiteralType {}
 extension Int: _LiteralType {}
 extension Double: _LiteralType {}
 extension Bool: _LiteralType {}
+
+/// A macro that gives a struct TypeScript-style `extends` semantics: stored parent,
+/// flat JSON Codable, and keypath forwarding via `@dynamicMemberLookup`.
+///
+/// Add `@dynamicMemberLookup` on the struct alongside `@Extends` to enable
+/// implicit property forwarding. Without it, parent fields are accessible via `._parent`.
+///
+/// - Parameter parent: The parent type (e.g. `ParentType.self`).
+///
+/// ## Usage
+/// ```swift
+/// struct BaseEvent: Codable {
+///     var timestamp: Double
+/// }
+///
+/// @Extends(BaseEvent.self)
+/// @dynamicMemberLookup
+/// struct ClickEvent {
+///     var x: Int
+///     var y: Int
+/// }
+///
+/// let c = ClickEvent(BaseEvent(timestamp: 0), x: 1, y: 2)
+/// c.timestamp  // forwarded from BaseEvent
+/// c.x          // 1
+/// // JSON: {"timestamp":0,"x":1,"y":2}
+/// ```
+@attached(member, names: arbitrary)
+@attached(
+    extension,
+    conformances: Codable,
+    names: named(init(from:)),
+    named(encode(to:)),
+    named(CodingKeys)
+)
+public macro Extends(_ parent: Any.Type) =
+    #externalMacro(module: "TypeScriptBridgeMacros", type: "ExtendsMacro")
