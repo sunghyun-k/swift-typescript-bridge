@@ -9,5 +9,6 @@ struct TypeScriptBridgePlugin: CompilerPlugin {
         LiteralUnionMacro.self,
         TypeUnionMacro.self,
         UnionDiscriminatorMacro.self,
+        ExtendsMacro.self,
     ]
 }
