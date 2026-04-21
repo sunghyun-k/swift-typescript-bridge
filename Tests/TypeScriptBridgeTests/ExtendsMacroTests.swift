@@ -7,7 +7,6 @@ struct ExtendsBase: Codable, Equatable {
 }
 
 @Extends(ExtendsBase.self)
-@dynamicMemberLookup
 struct ExtendsChild: Equatable {
     var number: Int
 }
@@ -42,7 +41,6 @@ struct ExtendsChild: Equatable {
 }
 
 @Extends(ExtendsBase.self)
-@dynamicMemberLookup
 struct ExtendsChildWithOptional {
     var note: String?
 }
@@ -64,7 +62,6 @@ struct ExtendsDiscBase: Codable {
 }
 
 @Extends(ExtendsDiscBase.self)
-@dynamicMemberLookup
 struct ExtendsDiscChild {
     var payload: Int
 }
@@ -75,7 +72,6 @@ extension ExtendsDiscChild: TypeDiscriminated {
 }
 
 @Extends(ExtendsDiscBase.self)
-@dynamicMemberLookup
 struct ExtendsDiscChildB {
     var otherPayload: String
 }
@@ -95,7 +91,6 @@ struct OverrideBase: Codable, Equatable {
 }
 
 @Extends(OverrideBase.self)
-@dynamicMemberLookup
 struct OverrideChild: Equatable {
     @Union("specific") enum Kind {}
     var kind: Kind
@@ -147,6 +142,50 @@ struct OverrideChild: Equatable {
     #expect(c.kind == .specific)
     // Parent value remains accessible via _parent.
     #expect(c._parent.kind == "wrong")
+}
+
+// MARK: - Incompatible override diagnostic (parent-side typeMismatch)
+
+struct IncompatBase: Codable, Equatable {
+    var kind: Int
+    var other: Int
+}
+
+@Extends(IncompatBase.self)
+struct IncompatChild: Equatable {
+    var kind: String
+    var payload: Int
+}
+
+@Test func testIncompatibleOverrideSurfacesOverrideMessage() async throws {
+    // JSON has String for `kind` — parent expects Int, throws, child's override catches it.
+    let json = """
+        {"kind":"hello","other":0,"payload":7}
+        """
+    do {
+        _ = try decodeFromJSON(IncompatChild.self, from: json)
+        Issue.record("Expected decode to throw")
+    } catch let DecodingError.typeMismatch(_, ctx) {
+        #expect(ctx.debugDescription.contains("override"))
+        #expect(ctx.debugDescription.contains("kind"))
+    } catch {
+        Issue.record("Expected DecodingError.typeMismatch, got \(error)")
+    }
+}
+
+@Test func testParentErrorOnUnrelatedKeyPassesThroughUnchanged() async throws {
+    // `other` is NOT declared by child — parent-side error should not be rewritten.
+    let json = """
+        {"kind":0,"other":"not-an-int","payload":7}
+        """
+    do {
+        _ = try decodeFromJSON(IncompatChild.self, from: json)
+        Issue.record("Expected decode to throw")
+    } catch let DecodingError.typeMismatch(_, ctx) {
+        #expect(!ctx.debugDescription.contains("override"))
+    } catch {
+        Issue.record("Expected DecodingError.typeMismatch, got \(error)")
+    }
 }
 
 @Test func testExtendsInDiscriminatedUnionRoundtrip() async throws {

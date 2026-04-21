@@ -36,23 +36,6 @@ public struct ExtendsMacro: MemberMacro, ExtensionMacro {
             """
         )
 
-        // Forwarding subscripts — parent side.
-        decls.append(
-            """
-            \(raw: accessPrefix)subscript<T>(dynamicMember keyPath: WritableKeyPath<\(raw: parentTypeName), T>) -> T {
-                get { _parent[keyPath: keyPath] }
-                set { _parent[keyPath: keyPath] = newValue }
-            }
-            """
-        )
-        decls.append(
-            """
-            \(raw: accessPrefix)subscript<T>(dynamicMember keyPath: KeyPath<\(raw: parentTypeName), T>) -> T {
-                _parent[keyPath: keyPath]
-            }
-            """
-        )
-
         return decls
     }
 
@@ -135,8 +118,31 @@ public struct ExtendsMacro: MemberMacro, ExtensionMacro {
 
         // init(from:)
         var decodeBody: [String] = []
-        decodeBody.append("self._parent = try \(parentTypeName)(from: decoder)")
-        if !ownProps.isEmpty {
+        if ownProps.isEmpty {
+            decodeBody.append("self._parent = try \(parentTypeName)(from: decoder)")
+        } else {
+            // Wrap parent decode to detect property-override conflicts: if parent throws a
+            // typeMismatch at a codingPath key that Child also declares, surface a clearer
+            // message pointing at the override.
+            decodeBody.append(
+                """
+                do {
+                    self._parent = try \(parentTypeName)(from: decoder)
+                } catch let DecodingError.typeMismatch(expected, ctx)
+                    where ctx.codingPath.last.flatMap({ CodingKeys(stringValue: $0.stringValue) }) != nil
+                {
+                    let key = ctx.codingPath.last!.stringValue
+                    throw DecodingError.typeMismatch(
+                        expected,
+                        DecodingError.Context(
+                            codingPath: ctx.codingPath,
+                            debugDescription: \"Property '\\(key)' override conflict: parent's declared type (\\(expected)) is incompatible with the JSON value. The child redeclares '\\(key)' — ensure parent and child share a JSON representation.\",
+                            underlyingError: ctx.underlyingError
+                        )
+                    )
+                }
+                """
+            )
             decodeBody.append("let container = try decoder.container(keyedBy: CodingKeys.self)")
             for p in ownProps {
                 if p.isOptional {
@@ -169,7 +175,7 @@ public struct ExtendsMacro: MemberMacro, ExtensionMacro {
 
         let extensionDecl = try ExtensionDeclSyntax(
             """
-            extension \(type.trimmed): Codable {
+            extension \(type.trimmed): Codable, _ExtendsParent {
                 \(raw: codingKeysDecl)
 
                 \(raw: accessPrefix)init(from decoder: Decoder) throws {
