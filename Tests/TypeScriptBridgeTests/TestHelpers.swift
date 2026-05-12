@@ -88,11 +88,11 @@ enum TestError: Error, CustomStringConvertible {
         switch self {
         case .invalidJSONString:
             return "Invalid JSON string"
-        case let .unexpectedCase(message):
+        case .unexpectedCase(let message):
             return "Unexpected case: \(message)"
         case .unexpectedSuccess:
             return "Expected decoding to fail, but it succeeded"
-        case let .unexpectedErrorType(error):
+        case .unexpectedErrorType(let error):
             return "Expected DecodingError, but got \(type(of: error)): \(error)"
         }
     }

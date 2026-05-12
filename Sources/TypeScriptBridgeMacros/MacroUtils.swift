@@ -24,15 +24,17 @@ enum MacroUtils {
         }
         return nil
     }
-    
+
     /// Creates access prefix string from access modifier
     static func createAccessPrefix(from accessModifier: Keyword?) -> String {
-        return accessModifier != nil ? "\(accessModifier!) " : ""
+        accessModifier != nil ? "\(accessModifier!) " : ""
     }
-    
+
     /// Common error handling for enum validation
-    static func validateEnumDeclaration<T: Error>(_ declaration: some DeclGroupSyntax, 
-                                                  invalidError: T) throws -> EnumDeclSyntax {
+    static func validateEnumDeclaration<T: Error>(
+        _ declaration: some DeclGroupSyntax,
+        invalidError: T
+    ) throws -> EnumDeclSyntax {
         guard let enumDecl = declaration.as(EnumDeclSyntax.self) else {
             throw invalidError
         }
