@@ -12,7 +12,8 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-syntax.git", "509.0.0"..<"605.0.0")
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", "509.0.0"..<"605.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-macro-testing.git", from: "0.6.0"),
     ],
     targets: [
         .macro(
@@ -29,6 +30,13 @@ let package = Package(
         .testTarget(
             name: "TypeScriptBridgeTests",
             dependencies: ["TypeScriptBridge"]
+        ),
+        .testTarget(
+            name: "TypeScriptBridgeMacroExpansionTests",
+            dependencies: [
+                "TypeScriptBridgeMacros",
+                .product(name: "MacroTesting", package: "swift-macro-testing"),
+            ]
         ),
     ]
 )
