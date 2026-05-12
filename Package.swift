@@ -38,5 +38,10 @@ let package = Package(
                 .product(name: "MacroTesting", package: "swift-macro-testing"),
             ]
         ),
+        .executableTarget(
+            name: "Examples",
+            dependencies: ["TypeScriptBridge"],
+            path: "Examples"
+        ),
     ]
 )
