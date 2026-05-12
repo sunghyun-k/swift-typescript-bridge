@@ -4,6 +4,9 @@ Bring TypeScript-style union types to Swift with type safety and automatic JSON 
 
 [![Swift 6.2+](https://img.shields.io/badge/Swift-6.2+-blue.svg)](https://swift.org)
 [![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20Linux-lightgray.svg)](https://github.com/sunghyun-k/swift-typescript-bridge)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fsunghyun-k%2Fswift-typescript-bridge%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/sunghyun-k/swift-typescript-bridge)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fsunghyun-k%2Fswift-typescript-bridge%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/sunghyun-k/swift-typescript-bridge)
+[![CI](https://github.com/sunghyun-k/swift-typescript-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/sunghyun-k/swift-typescript-bridge/actions/workflows/ci.yml)
 
 [한국어 문서](./README.ko.md)
 
@@ -247,7 +250,127 @@ let analyticsEvent = try JSONDecoder().decode(WebEvent.self, from: jsonData)
 
 ## How It Works
 
-Built on Swift macros—all code generation happens at compile time with zero runtime overhead. Expand macros in Xcode to see exactly what's generated.
+Built on Swift macros—all code generation happens at compile time with zero runtime overhead. Right-click the macro and choose **Expand Macro** in Xcode to inspect the generated code, or skim the cheat-sheet below.
+
+### Macro Expansion Cheat-Sheet
+
+#### `@Union(...literals)`
+
+```swift
+// You write:
+@Union("click", "hover") enum EventType {}
+
+// Macro generates (roughly):
+enum EventType {
+    case `click`
+    case `hover`
+}
+extension EventType: Codable, Equatable {
+    var rawValue: String {
+        switch self {
+        case .`click`:  return "click"
+        case .`hover`:  return "hover"
+        }
+    }
+    init?(rawValue: String) { /* … */ }
+    init(from decoder: Decoder) throws { /* singleValueContainer + Self(rawValue:) */ }
+    func encode(to encoder: Encoder) throws { /* singleValueContainer */ }
+}
+```
+
+#### `@Union(...types)`
+
+```swift
+// You write:
+@Union(User.self, Organization.self) enum Entity {}
+
+// Macro generates (roughly):
+enum Entity {
+    case user(User)
+    case organization(Organization)
+}
+extension Entity: Codable {
+    init(from decoder: Decoder) throws {
+        // 1) Try each TypeDiscriminated case directly (fast path)
+        // 2) Fall back to sequential single-value decode
+    }
+    func encode(to encoder: Encoder) throws { /* singleValueContainer */ }
+}
+```
+
+#### `@UnionDiscriminator("key")`
+
+```swift
+// You write:
+@UnionDiscriminator("type")
+struct ClickEvent: Codable {
+    @Union("click") enum EventType {}
+    let type: EventType
+    let x: Int
+}
+
+// Macro adds (just the protocol witness — your struct itself is unchanged):
+extension ClickEvent: TypeDiscriminated {
+    typealias DiscriminatorType = EventType
+    static let discriminatorKey = "type"
+}
+```
+
+#### `@Extends(Parent.self)`
+
+```swift
+// You write:
+@Extends(BaseEvent.self)
+struct ClickEvent {
+    var x: Int
+    var y: Int
+}
+
+// Macro generates (roughly):
+struct ClickEvent {
+    var _parent: BaseEvent
+    var x: Int
+    var y: Int
+    init(_ parent: BaseEvent, x: Int, y: Int) { /* … */ }
+}
+extension ClickEvent: Codable, _ExtendsParent {
+    private enum CodingKeys: String, CodingKey { case x; case y }
+    init(from decoder: Decoder) throws {
+        // Decode parent first (flat JSON), then own keys override
+        self._parent = try BaseEvent(from: decoder)
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.x = try c.decode(Int.self, forKey: .x)
+        self.y = try c.decode(Int.self, forKey: .y)
+    }
+    func encode(to encoder: Encoder) throws {
+        try _parent.encode(to: encoder)
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(x, forKey: .x)
+        try c.encode(y, forKey: .y)
+    }
+}
+```
+
+## Tuple-Literal Unions Are Not Supported
+
+TypeScript permits `type Pair = [1, 2] | [3, 4]` — a union of *tuple* literals. We deliberately do not support this in `@Union(...)`:
+
+- Swift 6.2's arbitrary-identifier syntax (`` ` … ` ``) only accepts identifier-like characters, so a case name like `` `[1, 2]` `` is illegal — there is no clean automatic name to pick.
+- The pattern is rare in real TypeScript codebases. Existing patterns produce a clearer Swift model:
+
+```swift
+// Instead of `type Pair = [1, 2] | [3, 4]`, model each tuple as a struct
+// and union the structs — this also gives every variant a proper name.
+
+struct PairOneTwo: Codable { let a = 1; let b = 2 }
+struct PairThreeFour: Codable { let a = 3; let b = 4 }
+
+@Union(PairOneTwo.self, PairThreeFour.self) enum Pair {}
+```
+
+## More Examples
+
+See the [`Examples/`](./Examples) directory for realistic, end-to-end TypeScript ↔ Swift mappings (analytics events, API responses, discriminated webhooks).
 
 ## Requirements
 

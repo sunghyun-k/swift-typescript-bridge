@@ -4,6 +4,9 @@ TypeScript 스타일의 유니온 타입을 Swift로 가져오세요. 타입 안
 
 [![Swift 6.2+](https://img.shields.io/badge/Swift-6.2+-blue.svg)](https://swift.org)
 [![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20Linux-lightgray.svg)](https://github.com/sunghyun-k/swift-typescript-bridge)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fsunghyun-k%2Fswift-typescript-bridge%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/sunghyun-k/swift-typescript-bridge)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fsunghyun-k%2Fswift-typescript-bridge%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/sunghyun-k/swift-typescript-bridge)
+[![CI](https://github.com/sunghyun-k/swift-typescript-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/sunghyun-k/swift-typescript-bridge/actions/workflows/ci.yml)
 
 [English Documentation](./README.md)
 
@@ -247,7 +250,124 @@ let analyticsEvent = try JSONDecoder().decode(WebEvent.self, from: jsonData)
 
 ## 작동 원리
 
-Swift 매크로 기반—모든 코드 생성은 컴파일 타임에 발생하며 런타임 오버헤드가 전혀 없습니다. Xcode에서 매크로를 확장하면 생성된 코드를 정확히 볼 수 있습니다.
+Swift 매크로 기반—모든 코드 생성은 컴파일 타임에 발생하며 런타임 오버헤드가 전혀 없습니다. Xcode에서 매크로 attribute 를 우클릭 → **Expand Macro** 로 생성된 코드를 직접 확인할 수 있고, 아래 치트시트로도 대략적인 형태를 파악할 수 있습니다.
+
+### 매크로 전개 치트시트
+
+#### `@Union(...리터럴들)`
+
+```swift
+// 작성:
+@Union("click", "hover") enum EventType {}
+
+// 생성 (대략):
+enum EventType {
+    case `click`
+    case `hover`
+}
+extension EventType: Codable, Equatable {
+    var rawValue: String {
+        switch self {
+        case .`click`:  return "click"
+        case .`hover`:  return "hover"
+        }
+    }
+    init?(rawValue: String) { /* … */ }
+    init(from decoder: Decoder) throws { /* singleValueContainer + Self(rawValue:) */ }
+    func encode(to encoder: Encoder) throws { /* singleValueContainer */ }
+}
+```
+
+#### `@Union(...타입들)`
+
+```swift
+// 작성:
+@Union(User.self, Organization.self) enum Entity {}
+
+// 생성 (대략):
+enum Entity {
+    case user(User)
+    case organization(Organization)
+}
+extension Entity: Codable {
+    init(from decoder: Decoder) throws {
+        // 1) TypeDiscriminated 케이스를 우선 시도 (fast path)
+        // 2) 실패하면 순차 single-value 디코드로 fallback
+    }
+    func encode(to encoder: Encoder) throws { /* singleValueContainer */ }
+}
+```
+
+#### `@UnionDiscriminator("key")`
+
+```swift
+// 작성:
+@UnionDiscriminator("type")
+struct ClickEvent: Codable {
+    @Union("click") enum EventType {}
+    let type: EventType
+    let x: Int
+}
+
+// 생성 (struct 본체는 그대로, 프로토콜 증명만 추가):
+extension ClickEvent: TypeDiscriminated {
+    typealias DiscriminatorType = EventType
+    static let discriminatorKey = "type"
+}
+```
+
+#### `@Extends(Parent.self)`
+
+```swift
+// 작성:
+@Extends(BaseEvent.self)
+struct ClickEvent {
+    var x: Int
+    var y: Int
+}
+
+// 생성 (대략):
+struct ClickEvent {
+    var _parent: BaseEvent
+    var x: Int
+    var y: Int
+    init(_ parent: BaseEvent, x: Int, y: Int) { /* … */ }
+}
+extension ClickEvent: Codable, _ExtendsParent {
+    private enum CodingKeys: String, CodingKey { case x; case y }
+    init(from decoder: Decoder) throws {
+        // flat JSON: 부모를 먼저 디코드 → 자식 키가 override
+        self._parent = try BaseEvent(from: decoder)
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.x = try c.decode(Int.self, forKey: .x)
+        self.y = try c.decode(Int.self, forKey: .y)
+    }
+    func encode(to encoder: Encoder) throws {
+        try _parent.encode(to: encoder)
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(x, forKey: .x)
+        try c.encode(y, forKey: .y)
+    }
+}
+```
+
+## Tuple-Literal Union 미지원
+
+TypeScript 에는 `type Pair = [1, 2] | [3, 4]` 처럼 **튜플** 리터럴 유니온이 있지만 `@Union(...)` 에서는 의도적으로 지원하지 않습니다:
+
+- Swift 6.2 의 임의 식별자 (`` ` … ` ``) 는 식별자형 문자만 허용 — `` `[1, 2]` `` 같은 case 명이 문법적으로 불가능해서 자동 명명이 깔끔하지 않습니다.
+- 실전 TS 코드베이스에서 이 패턴은 드뭅니다. 각 튜플을 struct 로 모델링한 뒤 union 하는 방식이 결과적으로 더 명확합니다:
+
+```swift
+struct PairOneTwo: Codable { let a = 1; let b = 2 }
+struct PairThreeFour: Codable { let a = 3; let b = 4 }
+
+@Union(PairOneTwo.self, PairThreeFour.self) enum Pair {}
+```
+
+## 더 많은 예제
+
+분석 이벤트, API 응답, 판별 웹훅 등 실전 TypeScript ↔ Swift 매핑 패턴은 [`Examples/`](./Examples) 디렉터리에서 확인할 수 있습니다.
 
 ## 요구사항
 
