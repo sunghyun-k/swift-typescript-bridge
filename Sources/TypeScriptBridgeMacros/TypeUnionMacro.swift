@@ -1,3 +1,4 @@
+import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
@@ -12,13 +13,13 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
     public static func expansion(
         of node: AttributeSyntax,
         providingMembersOf declaration: some DeclGroupSyntax,
-        in _: some MacroExpansionContext
+        in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
         guard let enumDecl = declaration.as(EnumDeclSyntax.self) else {
-            throw TypeUnionError.notAnEnum
+            try diagnoseNotAnEnum(declaration: declaration, in: context)
         }
 
-        let typeInfos = try extractTypeInfos(from: node)
+        let typeInfos = try extractTypeInfos(from: node, in: context)
         let accessModifier = MacroUtils.extractAccessModifier(from: enumDecl)
 
         let enumCases = typeInfos.map { typeInfo in
@@ -30,16 +31,16 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
                             parameters: EnumCaseParameterListSyntax([
                                 EnumCaseParameterSyntax(
                                     type: IdentifierTypeSyntax(name: .identifier(typeInfo.typeName))
-                                ),
+                                )
                             ])
                         )
-                    ),
+                    )
                 ])
             )
 
             if let modifier = accessModifier, modifier != .private {
                 enumCase.modifiers = DeclModifierListSyntax([
-                    DeclModifierSyntax(name: .keyword(modifier)),
+                    DeclModifierSyntax(name: .keyword(modifier))
                 ])
             }
 
@@ -56,13 +57,13 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
         attachedTo declaration: some DeclGroupSyntax,
         providingExtensionsOf type: some TypeSyntaxProtocol,
         conformingTo _: [TypeSyntax],
-        in _: some MacroExpansionContext
+        in context: some MacroExpansionContext
     ) throws -> [ExtensionDeclSyntax] {
         guard let enumDecl = declaration.as(EnumDeclSyntax.self) else {
-            throw TypeUnionError.notAnEnum
+            try diagnoseNotAnEnum(declaration: declaration, in: context)
         }
 
-        let typeInfos = try extractTypeInfos(from: node)
+        let typeInfos = try extractTypeInfos(from: node, in: context)
         let accessModifier = MacroUtils.extractAccessModifier(from: enumDecl)
 
         let initFromDecoderMethod = try createInitFromDecoder(cases: typeInfos, accessModifier: accessModifier)
@@ -78,29 +79,85 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
         return [extensionDecl]
     }
 
-    private static func extractTypeInfos(from node: AttributeSyntax) throws -> [TypeInfo] {
+    private static func extractTypeInfos(
+        from node: AttributeSyntax,
+        in context: some MacroExpansionContext
+    ) throws -> [TypeInfo] {
         guard let arguments = node.arguments?.as(LabeledExprListSyntax.self) else {
-            throw TypeUnionError.noTypeArguments
+            try context.diagnoseAndThrow(
+                at: node,
+                message: MacroDiagnostic(
+                    id: "typeUnion.noTypeArguments",
+                    "@Union requires at least one type argument (Type.self)"
+                )
+            )
         }
 
         var typeInfos: [TypeInfo] = []
 
         for argument in arguments {
             if let memberAccess = argument.expression.as(MemberAccessExprSyntax.self),
-               let baseExpr = memberAccess.base?.as(DeclReferenceExprSyntax.self),
-               memberAccess.declName.baseName.text == "self"
+                let baseExpr = memberAccess.base?.as(DeclReferenceExprSyntax.self),
+                memberAccess.declName.baseName.text == "self"
             {
                 let typeName = baseExpr.baseName.text
                 let caseName = typeName.prefix(1).lowercased() + typeName.dropFirst()
                 typeInfos.append(TypeInfo(typeName: typeName, caseName: caseName))
+                continue
             }
+            // FixIt: bare type reference — suggest `.self`.
+            var fixIts: [FixIt] = []
+            if let bare = argument.expression.as(DeclReferenceExprSyntax.self) {
+                let replacement: ExprSyntax = "\(bare).self"
+                fixIts.append(
+                    FixIt(
+                        message: MacroFixIt(
+                            id: "typeUnion.addSelf",
+                            "Append `.self` to refer to the type metatype"
+                        ),
+                        changes: [
+                            .replace(
+                                oldNode: Syntax(argument.expression),
+                                newNode: Syntax(replacement)
+                            )
+                        ]
+                    )
+                )
+            }
+            try context.diagnoseAndThrow(
+                at: argument.expression,
+                message: MacroDiagnostic(
+                    id: "typeUnion.invalidArg",
+                    "Each @Union argument must be a type in `Type.self` form"
+                ),
+                fixIts: fixIts
+            )
         }
 
         if typeInfos.isEmpty {
-            throw TypeUnionError.noValidTypes
+            try context.diagnoseAndThrow(
+                at: node,
+                message: MacroDiagnostic(
+                    id: "typeUnion.noValidTypes",
+                    "@Union requires at least one valid type argument (Type.self)"
+                )
+            )
         }
 
         return typeInfos
+    }
+
+    private static func diagnoseNotAnEnum(
+        declaration: some DeclGroupSyntax,
+        in context: some MacroExpansionContext
+    ) throws -> Never {
+        try context.diagnoseAndThrow(
+            at: declaration,
+            message: MacroDiagnostic(
+                id: "typeUnion.notAnEnum",
+                "@Union can only be applied to enum declarations"
+            )
+        )
     }
 
     private static func createInitFromDecoder(cases: [TypeInfo], accessModifier: Keyword?) throws
@@ -140,7 +197,8 @@ public struct TypeUnionMacro: MemberMacro, ExtensionMacro {
         }
     }
 
-    private static func createEncodeToEncoder(cases: [TypeInfo], accessModifier: Keyword?) throws -> FunctionDeclSyntax {
+    private static func createEncodeToEncoder(cases: [TypeInfo], accessModifier: Keyword?) throws -> FunctionDeclSyntax
+    {
         let accessPrefix = accessModifier.flatMap { $0 == .private ? nil : $0 }.map { "\($0) " } ?? ""
 
         return try FunctionDeclSyntax(
@@ -182,25 +240,4 @@ struct TypeInfo {
     let typeName: String
     /// The enum case name (same as typeName)
     let caseName: String
-}
-
-/// Errors that can occur during type union macro expansion.
-enum TypeUnionError: Error, CustomStringConvertible {
-    /// The macro was applied to a non-enum declaration
-    case notAnEnum
-    /// No type arguments were provided to the macro
-    case noTypeArguments
-    /// No valid type arguments were found (must be in Type.self format)
-    case noValidTypes
-
-    var description: String {
-        switch self {
-        case .notAnEnum:
-            return "@Union can only be applied to enum declarations"
-        case .noTypeArguments:
-            return "@Union requires type arguments"
-        case .noValidTypes:
-            return "@Union requires valid type arguments like Type.self"
-        }
-    }
 }

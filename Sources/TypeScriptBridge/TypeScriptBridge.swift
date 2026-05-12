@@ -59,7 +59,7 @@ import Foundation
     named(init(from:)),
     named(encode(to:))
 )
-public macro Union(_ literals: any _LiteralType...) =
+public macro Union(_ literals: (any _LiteralType)?...) =
     #externalMacro(module: "TypeScriptBridgeMacros", type: "LiteralUnionMacro")
 
 /// A macro that creates a union type from Swift types, similar to TypeScript's union types.
@@ -135,7 +135,8 @@ extension Double: _LiteralType {}
 extension Bool: _LiteralType {}
 
 /// Internal-use protocol that enables implicit keypath forwarding for `@Extends`-decorated
-/// structs. Users do not conform to this directly — `@Extends` adds the conformance.
+/// structs with a single parent. Users do not conform to this directly — `@Extends` adds
+/// the conformance.
 @dynamicMemberLookup
 public protocol _ExtendsParent {
     associatedtype Parent
@@ -153,12 +154,40 @@ extension _ExtendsParent {
     }
 }
 
-/// A macro that gives a struct TypeScript-style `extends` semantics: stored parent,
+// MARK: - Automatic TypeDiscriminated forwarding for @Extends(SingleParent.self)
+
+/// If you `@Extends` a parent that is already `@UnionDiscriminator`-marked, an empty
+/// `extension Child: TypeDiscriminated {}` is enough — `discriminatorKey` and
+/// `DiscriminatorType` are forwarded from the parent automatically.
+extension _ExtendsParent where Parent: TypeDiscriminated {
+    public typealias DiscriminatorType = Parent.DiscriminatorType
+    public static var discriminatorKey: String { Parent.discriminatorKey }
+}
+
+/// Marker protocol for `@Extends` with two or more parents. Carries
+/// `@dynamicMemberLookup`; the macro emits per-parent keypath subscripts directly in the
+/// generated extension. Users do not conform to this directly.
+@dynamicMemberLookup
+public protocol _ExtendsParents {
+    // Marker. Concrete subscripts are macro-generated per parent type.
+    // A do-nothing default subscript is provided so the protocol itself is well-formed;
+    // it is shadowed by the macro-generated overloads on the conforming type.
+    subscript(dynamicMember _: KeyPath<Never, Never>) -> Never { get }
+}
+
+extension _ExtendsParents {
+    public subscript(dynamicMember keyPath: KeyPath<Never, Never>) -> Never {
+        fatalError("unreachable: Never has no keypaths")
+    }
+}
+
+/// A macro that gives a struct TypeScript-style `extends` semantics: stored parent(s),
 /// flat JSON Codable, and keypath forwarding to parent properties.
 ///
-/// - Parameter parent: The parent type (e.g. `ParentType.self`).
+/// - Parameter parents: One or more parent types (e.g. `ParentType.self`,
+///   or `A.self, B.self` for multiple parents).
 ///
-/// ## Usage
+/// ## Single Parent
 /// ```swift
 /// struct BaseEvent: Codable {
 ///     var timestamp: Double
@@ -175,14 +204,37 @@ extension _ExtendsParent {
 /// c.x          // 1
 /// // JSON: {"timestamp":0,"x":1,"y":2}
 /// ```
+///
+/// ## Multiple Parents
+/// ```swift
+/// struct Identified: Codable { var id: String }
+/// struct Timestamped: Codable { var createdAt: Double }
+///
+/// @Extends(Identified.self, Timestamped.self)
+/// struct Article {
+///     var title: String
+/// }
+///
+/// let a = Article(Identified(id: "x"), Timestamped(createdAt: 0), title: "Hi")
+/// a.id          // forwarded from Identified
+/// a.createdAt   // forwarded from Timestamped
+/// a.title       // own
+/// // JSON: {"id":"x","createdAt":0,"title":"Hi"}
+/// ```
+///
+/// When two parents declare the same JSON key, the later-listed parent wins on encode
+/// (it writes after the earlier one) and on decode (both read from the same container;
+/// the later assignment overwrites). Child-owned properties always shadow parents.
 @attached(member, names: arbitrary)
 @attached(
     extension,
     conformances: Codable,
     _ExtendsParent,
+    _ExtendsParents,
     names: named(init(from:)),
     named(encode(to:)),
-    named(CodingKeys)
+    named(CodingKeys),
+    named(subscript(dynamicMember:))
 )
-public macro Extends(_ parent: Any.Type) =
+public macro Extends(_ parents: Any.Type...) =
     #externalMacro(module: "TypeScriptBridgeMacros", type: "ExtendsMacro")

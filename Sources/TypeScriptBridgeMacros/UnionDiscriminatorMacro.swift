@@ -1,3 +1,4 @@
+import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
@@ -19,20 +20,38 @@ public struct UnionDiscriminatorMacro: ExtensionMacro {
     ) throws -> [ExtensionDeclSyntax] {
 
         guard let structDecl = declaration.as(StructDeclSyntax.self) else {
-            throw UnionDiscriminatorError.notAStruct
+            try context.diagnoseAndThrow(
+                at: declaration,
+                message: MacroDiagnostic(
+                    id: "discriminator.notAStruct",
+                    "@UnionDiscriminator can only be applied to struct declarations"
+                )
+            )
         }
 
         // Extract property name argument
-        let keyFieldName = try extractPropertyName(from: node)
+        let keyFieldName = try extractPropertyName(from: node, in: context)
 
         // Find the field in the struct
         guard let fieldType = findFieldType(named: keyFieldName, in: structDecl) else {
-            throw UnionDiscriminatorError.fieldNotFound(keyFieldName)
+            try context.diagnoseAndThrow(
+                at: node,
+                message: MacroDiagnostic(
+                    id: "discriminator.fieldNotFound",
+                    "Property '\(keyFieldName)' not found in struct. @UnionDiscriminator expects the named property to be declared on the same struct."
+                )
+            )
         }
 
         // Verify that the enum declaration exists for this field type
         guard findEnumDeclaration(named: fieldType, in: structDecl) != nil else {
-            throw UnionDiscriminatorError.enumNotFound(fieldType)
+            try context.diagnoseAndThrow(
+                at: node,
+                message: MacroDiagnostic(
+                    id: "discriminator.enumNotFound",
+                    "Enum type '\(fieldType)' (referenced by '\(keyFieldName)') not found in struct. Declare it as a nested enum, typically via `@Union(\"…\") enum \(fieldType) {}`."
+                )
+            )
         }
 
         // Generate the extension with DiscriminatorType typealias
@@ -45,19 +64,43 @@ public struct UnionDiscriminatorMacro: ExtensionMacro {
     }
 
     /// Extracts the property name from the unlabeled argument
-    private static func extractPropertyName(from node: AttributeSyntax) throws -> String {
+    private static func extractPropertyName(
+        from node: AttributeSyntax,
+        in context: some MacroExpansionContext
+    ) throws -> String {
         guard let arguments = node.arguments?.as(LabeledExprListSyntax.self),
             let firstArg = arguments.first
         else {
-            throw UnionDiscriminatorError.missingProperty
+            try context.diagnoseAndThrow(
+                at: node,
+                message: MacroDiagnostic(
+                    id: "discriminator.missingProperty",
+                    "@UnionDiscriminator requires a property name argument (e.g. @UnionDiscriminator(\"type\"))"
+                )
+            )
         }
 
-        // Check that the argument is unlabeled (label is nil or empty)
+        // Check that the argument is unlabeled.
         if let label = firstArg.label, !label.text.isEmpty {
-            throw UnionDiscriminatorError.unexpectedLabel
+            // FixIt: remove the label.
+            let stripped = firstArg.with(\.label, nil).with(\.colon, nil)
+            let fixIt = FixIt(
+                message: MacroFixIt(
+                    id: "discriminator.dropLabel",
+                    "Drop the argument label"
+                ),
+                changes: [.replace(oldNode: Syntax(firstArg), newNode: Syntax(stripped))]
+            )
+            try context.diagnoseAndThrow(
+                at: firstArg,
+                message: MacroDiagnostic(
+                    id: "discriminator.unexpectedLabel",
+                    "@UnionDiscriminator expects an unlabeled argument. Use @UnionDiscriminator(\"type\") not @UnionDiscriminator(property: \"type\")"
+                ),
+                fixIts: [fixIt]
+            )
         }
 
-        // Handle string literal
         if let stringLiteral = firstArg.expression.as(StringLiteralExprSyntax.self) {
             for segment in stringLiteral.segments {
                 if let stringSegment = segment.as(StringSegmentSyntax.self) {
@@ -66,7 +109,13 @@ public struct UnionDiscriminatorMacro: ExtensionMacro {
             }
         }
 
-        throw UnionDiscriminatorError.invalidProperty
+        try context.diagnoseAndThrow(
+            at: firstArg.expression,
+            message: MacroDiagnostic(
+                id: "discriminator.invalidProperty",
+                "Expected a string literal property name (e.g. \"type\")"
+            )
+        )
     }
 
     /// Finds the type of a field in the struct
@@ -102,32 +151,4 @@ public struct UnionDiscriminatorMacro: ExtensionMacro {
         return nil
     }
 
-}
-
-/// Errors that can occur during union discriminator macro expansion.
-enum UnionDiscriminatorError: Error, CustomStringConvertible {
-    case notAStruct
-    case missingProperty
-    case invalidProperty
-    case unexpectedLabel
-    case fieldNotFound(String)
-    case enumNotFound(String)
-
-    var description: String {
-        switch self {
-        case .notAStruct:
-            return "@UnionDiscriminator can only be applied to struct declarations"
-        case .missingProperty:
-            return "@UnionDiscriminator requires a property name argument"
-        case .invalidProperty:
-            return "Invalid property format. Expected a string literal (e.g., \"type\")"
-        case .unexpectedLabel:
-            return
-                "@UnionDiscriminator expects an unlabeled argument. Use @UnionDiscriminator(\"type\") not @UnionDiscriminator(property: \"type\")"
-        case .fieldNotFound(let name):
-            return "Property '\(name)' not found in struct"
-        case .enumNotFound(let name):
-            return "Enum type '\(name)' not found in struct"
-        }
-    }
 }

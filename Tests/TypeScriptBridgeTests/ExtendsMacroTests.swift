@@ -66,20 +66,17 @@ struct ExtendsDiscChild {
     var payload: Int
 }
 
-extension ExtendsDiscChild: TypeDiscriminated {
-    typealias DiscriminatorType = ExtendsDiscBase.Kind
-    static var discriminatorKey: String { ExtendsDiscBase.discriminatorKey }
-}
+// With the parent (ExtendsDiscBase) marked `@UnionDiscriminator`, an empty
+// TypeDiscriminated conformance is enough — the default impls on
+// `_ExtendsParent where Parent: TypeDiscriminated` supply the witness.
+extension ExtendsDiscChild: TypeDiscriminated {}
 
 @Extends(ExtendsDiscBase.self)
 struct ExtendsDiscChildB {
     var otherPayload: String
 }
 
-extension ExtendsDiscChildB: TypeDiscriminated {
-    typealias DiscriminatorType = ExtendsDiscBase.Kind
-    static var discriminatorKey: String { ExtendsDiscBase.discriminatorKey }
-}
+extension ExtendsDiscChildB: TypeDiscriminated {}
 
 @Union(ExtendsDiscChild.self, ExtendsDiscChildB.self) enum ExtendsDiscUnion {}
 
