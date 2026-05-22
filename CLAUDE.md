@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 TypeScript 의 union / `extends` 패턴을 Swift 매크로로 가져오는 SwiftPM 라이브러리. 모든 코드 생성은 컴파일 타임에 swift-syntax 로 이뤄지며 런타임 오버헤드는 없다.
 
 - Swift tools: 6.2
-- swift-syntax 범위: `509.0.0 ..< 605.0.0` (Xcode 16 / 16.4 / 26 호환 목적으로 의도적으로 폭넓게 잡음 — 좁히지 말 것)
+- swift-syntax 범위: `600.0.0 ..< 605.0.0` (Xcode 16 / 16.4 / 26 호환 목적으로 600 라인 전체를 받음 — 신형 `MemberMacro.expansion(... conformingTo: ...)` 시그니처 사용을 위해 하한이 600. 상한은 좁히지 말 것)
 - 플랫폼: iOS 13+ / macOS 10.15+ / tvOS 13+ / watchOS 6+ / macCatalyst 13+ / Linux
 
 ## 자주 쓰는 명령
